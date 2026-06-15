@@ -22,6 +22,7 @@ import {
   UserRound,
   X
 } from 'lucide-react';
+import type { FocusEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { brandIcon } from '@/lib/routes';
 import { GlobalSearch } from '@/components/global-search';
@@ -96,6 +97,7 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
   const [consoleClosing, setConsoleClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('light');
+  const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
   const consoleData = snapshot.console;
 
   const totalStoryYears = useMemo(
@@ -175,6 +177,20 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
     return items.some((item) => pathname.startsWith(item.href));
   }
 
+  function navGroupHandlers(key: string) {
+    return {
+      onMouseEnter: () => setOpenNavGroup(key),
+      onMouseLeave: () => setOpenNavGroup((current) => current === key ? null : current),
+      onFocus: () => setOpenNavGroup(key),
+      onBlur: (event: FocusEvent<HTMLDivElement>) => {
+        const nextTarget = event.relatedTarget;
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+          setOpenNavGroup((current) => current === key ? null : current);
+        }
+      }
+    };
+  }
+
   const consoleGroups = navGroups.map((group) => ({
     key: group.key,
     label: group.label,
@@ -208,9 +224,10 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
           {navGroups.map((group) => {
             const groupItems = group.items.filter((item) => !('auth' in item) || user);
             const active = activeGroup(groupItems);
+            const open = openNavGroup === group.key;
             return (
-              <div key={group.key} className={active ? 'nav-group active' : 'nav-group'}>
-                <button type="button" className="nav-group-trigger" aria-haspopup="true" aria-expanded={active}>
+              <div key={group.key} className={`nav-group${active ? ' active' : ''}${open ? ' open' : ''}`} {...navGroupHandlers(group.key)}>
+                <button type="button" className="nav-group-trigger" aria-haspopup="true" aria-expanded={open}>
                   <span>{group.label}</span>
                 </button>
                 <div className="nav-dropdown" role="menu">
@@ -471,9 +488,10 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
         {navGroups.map((group) => {
           const groupItems = group.items.filter((item) => !('auth' in item) || user);
           const active = activeGroup(groupItems);
+          const open = openNavGroup === group.key;
           return (
-            <div key={group.key} className={active ? 'nav-group active' : 'nav-group'}>
-              <button type="button" className="nav-group-trigger" aria-haspopup="true" aria-expanded={active}>
+            <div key={group.key} className={`nav-group${active ? ' active' : ''}${open ? ' open' : ''}`} {...navGroupHandlers(group.key)}>
+              <button type="button" className="nav-group-trigger" aria-haspopup="true" aria-expanded={open}>
                 <span>{group.label}</span>
               </button>
               <div className="nav-dropdown" role="menu">

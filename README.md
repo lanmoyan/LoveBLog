@@ -49,6 +49,17 @@ npm run seed
 npm run dev
 ```
 
+如果本机没有 Docker，但已经有 PostgreSQL 服务，可以直接修改 `.env` 里的 `DATABASE_URL`，确保数据库名、用户名和密码对应本机配置，然后运行：
+
+```bash
+npm install
+npm run db:migrate
+npm run seed
+npm run dev
+```
+
+默认 seed 只会写入站点基础配置；如果希望在空库里创建演示账号，可以临时设置 `SEED_DEFAULT_USERS=1` 后再运行 `npm run seed`。
+
 导入旧版数据：
 
 ```bash
