@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdminUser } from '@/lib/auth';
-import { readLocalImageMeta } from '@/lib/exif';
+import { readCachedImageMeta } from '@/lib/image-meta-cache';
 import { prisma } from '@/lib/prisma';
 import { jsonError } from '@/lib/responses';
 import { getSetting } from '@/lib/settings';
@@ -26,7 +26,7 @@ function publicEvent<T extends { image: string; imageMeta: string }>(event: T) {
 
 async function autoMeta(image: string) {
   if ((await getSetting('image_meta_enabled', '1')) === '0') return {};
-  return readLocalImageMeta(image);
+  return readCachedImageMeta(image);
 }
 
 export async function PUT(request: Request, context: Context) {

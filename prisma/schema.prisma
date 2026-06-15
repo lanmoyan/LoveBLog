@@ -92,6 +92,23 @@ model PostImage {
   @@map("post_images")
 }
 
+model ImageAsset {
+  id           Int      @id @default(autoincrement())
+  path         String   @unique
+  originalName String   @default("") @map("original_name")
+  mimeType     String   @default("") @map("mime_type")
+  fileSize     Int      @default(0) @map("file_size")
+  width        Int      @default(0)
+  height       Int      @default(0)
+  exifMeta     String   @default("{}") @map("exif_meta")
+  variants     String   @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt])
+  @@map("image_assets")
+}
+
 model Like {
   id        Int      @id @default(autoincrement())
   postId    Int      @map("post_id")

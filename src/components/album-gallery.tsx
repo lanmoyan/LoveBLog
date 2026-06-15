@@ -1172,23 +1172,24 @@ function AlbumLightbox({
   const originalIndex = activeItem?.index ?? activeIndex;
   const key = active ? imageKey(active, originalIndex) : '';
   const activeRatio = active ? dimensionRatio(active, dimensions, originalIndex) : 1;
+  const activePreviewSrc = active ? imageVariantUrl(active.path, 1800) : '';
   const slides = useMemo(
     () => items.map(({ image, index }) => ({
-      src: image.path,
+      src: imageVariantUrl(image.path, 1800),
       alt: photoTitle(image, index)
     })),
     [items]
   );
   const lightboxStyle = useMemo(() => ({
-    '--yarl__album_lightbox_bg_image': `url("${String(active?.path || '').replace(/["\\]/g, '\\$&')}")`
-  }) as CSSProperties & Record<`--yarl__${string}`, string>, [active?.path]);
+    '--yarl__album_lightbox_bg_image': `url("${String(activePreviewSrc).replace(/["\\]/g, '\\$&')}")`
+  }) as CSSProperties & Record<`--yarl__${string}`, string>, [activePreviewSrc]);
 
   useEffect(() => {
     if (!active || typeof window === 'undefined') return;
     const probe = new window.Image();
     probe.onload = () => rememberDimensions(key, probe.naturalWidth, probe.naturalHeight);
-    probe.src = active.path;
-  }, [active, key, rememberDimensions]);
+    probe.src = activePreviewSrc;
+  }, [active, activePreviewSrc, key, rememberDimensions]);
 
   useEffect(() => {
     setShowMobileMeta(false);

@@ -1,7 +1,8 @@
-import { readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
-import { findUploadFile } from '@/lib/upload-storage';
 import { uploadNameFromPublicPath } from '@/lib/uploads';
+
+const EXIF_SCAN_BYTES = 2 * 1024 * 1024;
 
 function trimNumber(n: number, digits = 2) {
   if (!Number.isFinite(n)) return '';
@@ -236,11 +237,19 @@ export async function readLocalImageMeta(publicPath: string | null | undefined) 
   if (!name) return {};
   const ext = path.extname(name).toLowerCase();
   if (!['.jpg', '.jpeg'].includes(ext)) return {};
+  const { findUploadFile } = await import('@/lib/upload-storage');
   const file = await findUploadFile(publicPath);
   if (!file) return {};
+  const handle = await open(file, 'r');
   try {
-    return parseExifBuffer(await readFile(file));
+    const info = await handle.stat();
+    const length = Math.min(info.size, EXIF_SCAN_BYTES);
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, 0);
+    return parseExifBuffer(buffer.subarray(0, bytesRead));
   } catch {
     return {};
+  } finally {
+    await handle.close().catch(() => {});
   }
 }

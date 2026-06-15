@@ -38,7 +38,7 @@ function ImageViewer({ event, onClose }: { event: any; onClose: () => void }) {
   const right = [meta.focal_length, meta.aperture, meta.exposure, meta.iso].filter(Boolean);
 
   return (
-    <ImageViewerPortal src={event.image} onClose={onClose}>
+    <ImageViewerPortal src={imageVariantUrl(event.image, 1800)} onClose={onClose}>
       <div className="viewer-meta left">{left.map((item) => <span key={item}><Camera size={13} />{item}</span>)}</div>
       <div className="viewer-meta right">{right.map((item) => <span key={item}>{item}</span>)}</div>
     </ImageViewerPortal>

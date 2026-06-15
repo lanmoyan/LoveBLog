@@ -1,6 +1,9 @@
-import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import sharp from 'sharp';
+import { parseExifBuffer } from '@/lib/exif';
+import { normalizeImageAssetPath, removeImageAsset, upsertImageAsset } from '@/lib/image-assets';
 import { uploadNameFromPublicPath } from '@/lib/uploads';
 
 const uploadPathPrefix = '/api/uploads/';
@@ -157,6 +160,110 @@ const videoTypes = new Map([
   ['video/quicktime', ['.mov']]
 ]);
 
+const prebuiltImageWidths = [160, 240, 320, 520, 640, 720, 900, 960, 1200, 1800];
+const imageVariantQuality = 78;
+const resizableImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function imageAssetPath(name: string) {
+  return `${uploadPathPrefix}${name}`;
+}
+
+function imageMimeTypeFromExt(ext: string) {
+  for (const [mimeType, extensions] of imageTypes) {
+    if (extensions.includes(ext)) return mimeType;
+  }
+  return '';
+}
+
+function mergeImageDimensions(meta: Record<string, unknown>, width = 0, height = 0) {
+  return {
+    ...meta,
+    ...(width && !meta.pixel_width ? { pixel_width: String(width) } : {}),
+    ...(height && !meta.pixel_height ? { pixel_height: String(height) } : {})
+  };
+}
+
+async function prebuildImageVariants(sourceFile: string, sourceSize: number, contentType: string) {
+  if (!resizableImageTypes.has(contentType)) return {};
+  const parsed = path.parse(sourceFile);
+  const cacheDir = path.join(parsed.dir, '.cache');
+  await mkdir(cacheDir, { recursive: true });
+
+  const variants: Array<{ width: number; quality: number; bytes: number }> = [];
+  await Promise.all(prebuiltImageWidths.map(async (width) => {
+    const cacheFile = path.join(cacheDir, `${parsed.name}-w${width}-q${imageVariantQuality}.webp`);
+    await sharp(sourceFile, { limitInputPixels: 80_000_000 })
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality: imageVariantQuality, effort: 4 })
+      .toFile(cacheFile);
+
+    const info = await stat(cacheFile).catch(() => null);
+    if (info?.isFile() && info.size > 0 && info.size < sourceSize) {
+      variants.push({ width, quality: imageVariantQuality, bytes: info.size });
+    } else {
+      await rm(cacheFile, { force: true }).catch(() => {});
+    }
+  }));
+
+  return variants.length
+    ? { webp: variants.sort((a, b) => a.width - b.width) }
+    : {};
+}
+
+async function cacheUploadedImageAsset({
+  publicPath,
+  sourceFile,
+  sourceBytes,
+  originalName,
+  mimeType,
+  fileSize
+}: {
+  publicPath: string;
+  sourceFile?: string;
+  sourceBytes: Buffer;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+}) {
+  if (!imageTypes.has(mimeType)) return;
+
+  let width = 0;
+  let height = 0;
+  let exifMeta: Record<string, unknown> = {};
+  let variants = {};
+
+  try {
+    const sharpMeta = sourceFile
+      ? await sharp(sourceFile, { limitInputPixels: 80_000_000 }).metadata()
+      : await sharp(sourceBytes, { limitInputPixels: 80_000_000 }).metadata();
+    width = sharpMeta.width || 0;
+    height = sharpMeta.height || 0;
+  } catch {
+    // Keep upload success independent from metadata extraction.
+  }
+
+  if (mimeType === 'image/jpeg') {
+    exifMeta = parseExifBuffer(sourceBytes);
+  }
+  exifMeta = mergeImageDimensions(exifMeta, width, height);
+
+  if (sourceFile) {
+    variants = await prebuildImageVariants(sourceFile, fileSize, mimeType).catch(() => ({}));
+  }
+
+  await upsertImageAsset({
+    path: publicPath,
+    originalName,
+    mimeType,
+    fileSize,
+    width,
+    height,
+    exifMeta,
+    variants
+  }).catch(() => {});
+}
+
 function hasKnownSignature(buffer: Buffer, type: string) {
   if (type === 'image/jpeg') return buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
   if (type === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
@@ -191,6 +298,7 @@ export async function saveUploadedFile(file: File, prefix = 'upload', options: {
   if (s3Enabled()) {
     const bucket = s3Bucket();
     if (!bucket) throw uploadError('对象存储桶未配置，请检查 S3_BUCKET 或 R2_BUCKET。');
+    const publicPath = s3PublicUrl(name);
     try {
       await s3Client().send(new PutObjectCommand({
         Bucket: bucket,
@@ -202,29 +310,72 @@ export async function saveUploadedFile(file: File, prefix = 'upload', options: {
     } catch (error) {
       throw uploadError(`对象存储上传失败：${storageErrorMessage(error)}`);
     }
-    return s3PublicUrl(name);
+    await cacheUploadedImageAsset({
+      publicPath,
+      sourceBytes: bytes,
+      originalName: file.name,
+      mimeType: file.type,
+      fileSize: file.size
+    });
+    return publicPath;
   }
 
   try {
     const targetUploadDir = uploadDir();
+    const targetFile = path.join(targetUploadDir, name);
     await mkdir(targetUploadDir, { recursive: true });
-    await writeFile(path.join(targetUploadDir, name), bytes);
+    await writeFile(targetFile, bytes);
     await Promise.all(uploadDirs()
       .filter((dir) => dir !== path.resolve(/*turbopackIgnore: true*/ targetUploadDir))
       .map(async (dir) => {
         await mkdir(dir, { recursive: true });
         await writeFile(path.join(dir, name), bytes);
       }));
+    await cacheUploadedImageAsset({
+      publicPath: imageAssetPath(name),
+      sourceFile: targetFile,
+      sourceBytes: bytes,
+      originalName: file.name,
+      mimeType: file.type,
+      fileSize: file.size
+    });
   } catch (error) {
     throw uploadError(`本地上传目录写入失败：${storageErrorMessage(error)}`);
   }
-  return `${uploadPathPrefix}${name}`;
+  return imageAssetPath(name);
+}
+
+export async function cacheStoredUploadImage(publicPath: string | null | undefined, options: { originalName?: string; mimeType?: string } = {}) {
+  const name = uploadNameFromPublicPath(publicPath);
+  if (!name) return null;
+
+  const file = await findUploadFile(publicPath);
+  if (!file) return null;
+
+  const ext = path.extname(name).toLowerCase();
+  const mimeType = options.mimeType
+    || imageMimeTypeFromExt(ext)
+    || '';
+  if (!imageTypes.has(mimeType)) return null;
+
+  const [info, bytes] = await Promise.all([stat(file), readFile(file)]);
+  const normalizedPath = normalizeImageAssetPath(publicPath) || imageAssetPath(name);
+  await cacheUploadedImageAsset({
+    publicPath: normalizedPath,
+    sourceFile: file,
+    sourceBytes: bytes,
+    originalName: options.originalName || name,
+    mimeType,
+    fileSize: info.size
+  });
+  return normalizedPath;
 }
 
 export async function removeUpload(publicPath: string | null | undefined) {
   const name = uploadNameFromPublicPath(publicPath);
   if (name) {
     if (!isManagedUploadName(name)) return;
+    await removeImageAsset(normalizeImageAssetPath(imageAssetPath(name)));
     await Promise.all(uploadDirs().map(async (dir) => {
       await rm(path.join(dir, name), { force: true }).catch(() => {});
       const parsed = path.parse(name);
@@ -241,6 +392,7 @@ export async function removeUpload(publicPath: string | null | undefined) {
   const raw = String(publicPath || '').trim();
   const baseUrl = s3PublicBaseUrl();
   if (!raw || !baseUrl || !raw.startsWith(`${baseUrl}/`)) return;
+  await removeImageAsset(raw);
   const key = raw
     .slice(baseUrl.length + 1)
     .split('/')

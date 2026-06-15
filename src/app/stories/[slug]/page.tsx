@@ -8,6 +8,7 @@ import { formatDateTime } from '@/lib/dates';
 import { prisma } from '@/lib/prisma';
 import { estimateReadMinutes } from '@/lib/reading';
 import { getSettingMap } from '@/lib/settings';
+import { imageVariantUrl } from '@/lib/image-variants';
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -27,7 +28,7 @@ export default async function StoryDetailPage({ params }: PageProps) {
   return (
     <article className="story-detail">
       <Link className="ghost-btn story-back" href="/stories/"><ArrowLeft size={16} /> 返回故事</Link>
-      {story.coverImage && <img className="story-detail-cover" src={story.coverImage} alt="" />}
+      {story.coverImage && <img className="story-detail-cover" src={imageVariantUrl(story.coverImage, 1800)} alt="" />}
       <header>
         <p className="page-kicker">Love Story</p>
         <h1>{story.title}</h1>

@@ -1,5 +1,6 @@
 import { AlbumGallery } from '@/components/album-gallery';
-import { readLocalImageMeta } from '@/lib/exif';
+import type { ImageAsset } from '@prisma/client';
+import { getImageAssetMap, imageMetaFromAsset, normalizeImageAssetPath } from '@/lib/image-assets';
 import { prisma } from '@/lib/prisma';
 import { getSiteSnapshot } from '@/lib/site';
 import { findUploadFile } from '@/lib/upload-storage';
@@ -21,8 +22,10 @@ function remoteFileName(value: string) {
   }
 }
 
-async function imageFileInfo(publicPath: string) {
-  const fileName = uploadNameFromPublicPath(publicPath) || remoteFileName(publicPath);
+async function imageFileInfo(publicPath: string, asset: ImageAsset | undefined) {
+  const fileName = asset?.originalName || uploadNameFromPublicPath(publicPath) || remoteFileName(publicPath);
+  if (asset?.fileSize) return { fileName, fileSize: formatBytes(asset.fileSize) };
+
   const file = await findUploadFile(publicPath);
   if (!file) return { fileName, fileSize: '' };
   const info = await fsStat(file).catch(() => null);
@@ -84,14 +87,13 @@ export default async function AlbumPage() {
     seenPaths.add(image.path);
     return true;
   });
+  const imageAssets = await getImageAssetMap(rawImages.map((image) => image.path));
   const images = (await Promise.all(rawImages.map(async (image) => {
-    const [imageMeta, fileInfo] = await Promise.all([
-      readLocalImageMeta(image.path),
-      imageFileInfo(image.path)
-    ]);
+    const asset = imageAssets.get(normalizeImageAssetPath(image.path));
+    const fileInfo = await imageFileInfo(image.path, asset);
     return {
       ...image,
-      imageMeta,
+      imageMeta: imageMetaFromAsset(asset),
       ...fileInfo
     };
   }))).sort((a, b) => {

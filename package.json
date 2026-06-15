@@ -15,6 +15,7 @@
     "seed": "tsx prisma/seed.ts",
     "clean:generated": "node scripts/clean-generated.mjs",
     "clean:next": "node scripts/clean-generated.mjs --next",
+    "images:warm": "tsx scripts/warm-image-assets.ts",
     "import:old": "node --experimental-sqlite --disable-warning=ExperimentalWarning scripts/import-old-db.mjs --reset"
   },
   "dependencies": {
