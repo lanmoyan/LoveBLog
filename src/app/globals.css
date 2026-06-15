@@ -235,6 +235,19 @@ input:focus, textarea:focus, select:focus {
   border-color: rgba(255,177,208,.12);
 }
 
+@media (max-width: 760px) {
+  :root[data-theme="dark"] .footer-brand-panel {
+    border-color: rgba(255,255,255,.12);
+    background: rgba(30,27,40,.74);
+    box-shadow: 0 16px 42px rgba(0,0,0,.18);
+  }
+  :root[data-theme="dark"] .footer-brand-panel p,
+  :root[data-theme="dark"] .footer-brand-records a,
+  :root[data-theme="dark"] .footer-brand-records span {
+    color: var(--muted);
+  }
+}
+
 @media (max-width: 980px) {
   .footer-main {
     grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(120px, .8fr));
@@ -250,29 +263,38 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 640px) {
   .site-footer {
-    gap: 20px;
-    padding-top: 28px;
+    gap: 0;
+    margin-top: 0;
+    padding: 12px 0 4px;
+    border-top-color: rgba(255,137,178,.12);
   }
   .footer-main {
     grid-template-columns: 1fr;
-    gap: 20px;
-    padding-bottom: 20px;
+    gap: 0;
+    padding-bottom: 0;
   }
   .footer-brand-panel {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 16px;
+    padding: 22px 20px;
+    border: 1px solid rgba(255,255,255,.72);
+    border-radius: 20px;
+    background: rgba(255,255,255,.54);
+    box-shadow: 0 16px 42px rgba(63,78,112,.08);
   }
   .footer-brand-mark {
-    width: 42px;
-    height: 42px;
+    width: 52px;
+    height: 52px;
   }
+  .footer-brand-panel p {
+    max-width: none;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  .footer-action-links,
   .footer-link-column,
   .footer-status-column {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px 16px;
-  }
-  .footer-link-column h3,
-  .footer-status-column h3 {
-    grid-column: 1 / -1;
+    display: none;
   }
   .footer-record-links {
     justify-self: start;
@@ -2453,6 +2475,34 @@ input:focus, textarea:focus, select:focus {
 .mood-album-toggle:focus-visible {
   background: rgba(255,111,159,.14);
 }
+@media (max-width: 760px) {
+  .mood-card-head {
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas:
+      "avatar author"
+      "avatar badge"
+      "toggle toggle";
+    align-items: start !important;
+    gap: 7px 10px;
+  }
+  .mood-card-head .mood-avatar {
+    grid-area: avatar;
+  }
+  .mood-card-head .mood-author {
+    grid-area: author;
+  }
+  .mood-card-head .mood-badge {
+    grid-area: badge;
+    justify-self: start;
+    max-width: 100%;
+    margin-top: 1px;
+  }
+  .mood-card-head .mood-album-toggle {
+    grid-area: toggle;
+    justify-self: start;
+    margin-top: 4px;
+  }
+}
 .mood-content {
   margin-top: 14px !important;
   padding: 0 2px;
@@ -3030,17 +3080,17 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   align-content: end;
   justify-items: start;
-  gap: 6px;
-  padding: 18px;
-  opacity: 0;
-  background: linear-gradient(180deg, rgba(2,6,23,0), rgba(2,6,23,.18) 32%, rgba(2,6,23,.82));
+  gap: 5px;
+  padding: 14px;
+  opacity: 1;
+  background: linear-gradient(180deg, rgba(2,6,23,0) 22%, rgba(2,6,23,.34) 58%, rgba(2,6,23,.86));
   color: #fff;
   text-shadow: 0 2px 12px rgba(0,0,0,.48);
-  transition: opacity .22s ease;
+  transition: background .22s ease;
 }
 .album-masonry-item button:hover .album-hover-meta,
 .album-masonry-item button:focus-visible .album-hover-meta {
-  opacity: 1;
+  background: linear-gradient(180deg, rgba(2,6,23,0) 12%, rgba(2,6,23,.42) 48%, rgba(2,6,23,.92));
 }
 .album-hover-meta b,
 .album-hover-meta small,
@@ -3052,7 +3102,7 @@ input:focus, textarea:focus, select:focus {
 }
 .album-hover-meta b {
   max-width: min(100%, 270px);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.08;
   font-weight: 950;
   white-space: nowrap;
@@ -3061,9 +3111,9 @@ input:focus, textarea:focus, select:focus {
   display: -webkit-box;
   max-width: min(100%, 290px);
   color: rgba(255,255,255,.86);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 850;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
 .album-hover-meta time {
@@ -3294,18 +3344,18 @@ input:focus, textarea:focus, select:focus {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 24px;
+  gap: 18px;
   grid-row: 1 / 3;
   grid-column: 2;
   overflow: auto;
-  padding: 24px 24px 34px;
+  padding: 22px 22px 28px;
   background: rgba(23,24,27,.70);
   box-shadow: inset 1px 0 0 rgba(255,255,255,.08);
 }
 .album-lightbox-title {
   display: grid;
-  gap: 10px;
-  padding-bottom: 18px;
+  gap: 8px;
+  padding-bottom: 14px;
   border-bottom: 1px solid rgba(255,255,255,.12);
 }
 .album-lightbox-title h2,
@@ -3323,6 +3373,10 @@ input:focus, textarea:focus, select:focus {
   color: rgba(255,255,255,.76);
   font-size: 14px;
   font-weight: 850;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .album-lightbox-tags {
   display: flex;
@@ -3339,7 +3393,7 @@ input:focus, textarea:focus, select:focus {
 }
 .album-lightbox-meta section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .album-lightbox-meta h3 {
   font-size: 16px;
@@ -4970,7 +5024,7 @@ input:focus, textarea:focus, select:focus {
 .global-search-excerpt {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 .global-search-card .global-search-arrow {
   grid-column: 3;
@@ -8824,6 +8878,40 @@ input:focus, textarea:focus, select:focus {
   .app-shell .story-magazine-card .story-card-foot {
     display: grid;
   }
+  .site-footer {
+    gap: 0;
+    margin-top: 0;
+    padding: 12px 0 4px;
+    border-top-color: rgba(255,137,178,.12);
+  }
+  .footer-main {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding-bottom: 0;
+  }
+  .footer-brand-panel {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 16px;
+    padding: 22px 20px;
+    border: 1px solid rgba(255,255,255,.72);
+    border-radius: 20px;
+    background: rgba(255,255,255,.54);
+    box-shadow: 0 16px 42px rgba(63,78,112,.08);
+  }
+  .footer-brand-mark {
+    width: 52px;
+    height: 52px;
+  }
+  .footer-brand-panel p {
+    max-width: none;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  .footer-action-links,
+  .footer-link-column,
+  .footer-status-column {
+    display: none;
+  }
   .app-shell .story-magazine-card .story-card-copy {
     padding: 22px;
   }
@@ -9161,10 +9249,10 @@ input:focus, textarea:focus, select:focus {
     grid-auto-rows: max-content;
     gap: 14px;
     overflow-y: auto;
-    padding: 126px 14px calc(92px + env(safe-area-inset-bottom));
+    padding: 14px 14px 18px;
     overscroll-behavior: contain;
-    scroll-padding-top: 126px;
-    scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    scroll-padding-top: 14px;
+    scroll-padding-bottom: 96px;
     scrollbar-width: none;
   }
 
@@ -9173,15 +9261,15 @@ input:focus, textarea:focus, select:focus {
   }
 
   .device-console-head {
-    position: fixed;
-    top: max(20px, env(safe-area-inset-top));
-    left: 50%;
-    width: min(528px, calc(100vw - 48px));
-    transform: translateX(-50%);
+    position: sticky;
+    top: 0;
+    width: 100%;
     z-index: 5;
     grid-template-columns: minmax(0, 1fr) 42px;
     min-height: 88px;
+    box-sizing: border-box;
     padding: 14px;
+    margin-bottom: 2px;
     border: 1px solid rgba(217,226,238,.72);
     border-radius: 22px;
     background: rgba(255,255,255,.78);
@@ -9358,9 +9446,9 @@ input:focus, textarea:focus, select:focus {
   .device-console-dock {
     position: fixed;
     left: 50%;
-    bottom: max(18px, env(safe-area-inset-bottom));
+    bottom: max(10px, env(safe-area-inset-bottom));
     width: min(528px, calc(100vw - 48px));
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(12px);
     z-index: 5;
     gap: 10px;
     padding: 8px;
@@ -9368,6 +9456,15 @@ input:focus, textarea:focus, select:focus {
     background: rgba(255,255,255,.80);
     backdrop-filter: blur(26px) saturate(150%);
     box-shadow: 0 18px 46px rgba(71,93,130,.14);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+
+  .device-console-dock.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
   }
 
   .device-console-dock a,
@@ -9426,14 +9523,14 @@ input:focus, textarea:focus, select:focus {
 
   .console-device-view {
     gap: 12px;
-    padding: 120px 12px calc(86px + env(safe-area-inset-bottom));
-    scroll-padding-top: 120px;
-    scroll-padding-bottom: calc(86px + env(safe-area-inset-bottom));
+    padding: 12px 12px 16px;
+    scroll-padding-top: 12px;
+    scroll-padding-bottom: 88px;
   }
 
   .device-console-head {
-    top: max(16px, env(safe-area-inset-top));
-    width: calc(100vw - 40px);
+    top: 0;
+    width: 100%;
     grid-template-columns: minmax(0, 1fr) 40px;
     min-height: 82px;
     padding: 12px;
@@ -9502,7 +9599,7 @@ input:focus, textarea:focus, select:focus {
   }
 
   .device-console-dock {
-    bottom: max(18px, env(safe-area-inset-bottom));
+    bottom: max(8px, env(safe-area-inset-bottom));
     width: calc(100vw - 40px);
     gap: 8px;
   }
@@ -11343,7 +11440,7 @@ input:focus, textarea:focus, select:focus {
 
 .album-global-lightbox {
   --yarl__color_backdrop: rgba(11,12,14,.94);
-  --album-lightbox-thumbs-height: 94px;
+  --album-lightbox-thumbs-height: 0px;
   --yarl__album_lightbox_bg_image: none;
 }
 
@@ -11393,38 +11490,47 @@ input:focus, textarea:focus, select:focus {
 }
 
 .album-global-lightbox .yarl__slide {
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 0 calc(var(--album-meta-width) + 32px) var(--album-lightbox-thumbs-height) 0;
+  padding: 0 calc(var(--album-meta-width) + 32px) 0 0;
 }
 
 .album-global-lightbox .yarl__slide_wrapper {
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
 }
 
 .album-global-lightbox .yarl__slide_image {
-  max-width: 100% !important;
-  max-height: calc(100dvh - var(--album-lightbox-thumbs-height)) !important;
+  width: auto !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: 100dvh !important;
   object-fit: contain;
-  object-position: center top;
-  box-shadow: 0 28px 80px rgba(0,0,0,.32);
+  object-position: center center;
+  box-shadow: none;
 }
 
 .album-global-lightbox.is-wide .yarl__slide_image {
-  width: 100%;
-  height: calc(100dvh - var(--album-lightbox-thumbs-height));
-  object-fit: cover;
+  width: auto !important;
+  height: 100dvh !important;
+  object-fit: contain;
 }
 
 .album-global-lightbox .yarl__toolbar {
-  right: var(--album-meta-width);
-  padding: 16px;
+  top: 16px;
+  right: calc(var(--album-meta-width) + 16px);
+  gap: 8px;
+  padding: 0;
 }
 
 .album-global-lightbox .yarl__button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border-radius: 999px;
   background: rgba(255,255,255,.10);
   color: rgba(255,255,255,.88);
+  box-shadow: 0 12px 30px rgba(0,0,0,.22);
   backdrop-filter: blur(12px) saturate(130%);
 }
 
@@ -11438,6 +11544,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .album-global-lightbox .yarl__thumbnails_container {
+  display: none;
   right: var(--album-meta-width);
   height: var(--album-lightbox-thumbs-height);
   min-height: var(--album-lightbox-thumbs-height);
@@ -11506,7 +11613,7 @@ input:focus, textarea:focus, select:focus {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 28px 24px 34px;
+  padding: 22px 20px 28px;
   background: rgba(23,24,27,.78);
   color: #fff;
   backdrop-filter: blur(18px) saturate(120%);
@@ -11533,13 +11640,13 @@ input:focus, textarea:focus, select:focus {
 .album-lightbox-meta {
   display: grid;
   align-content: start;
-  gap: 24px;
+  gap: 18px;
 }
 
 .album-lightbox-title {
   display: grid;
-  gap: 10px;
-  padding-bottom: 18px;
+  gap: 8px;
+  padding-bottom: 14px;
   border-bottom: 1px solid rgba(255,255,255,.12);
 }
 
@@ -11560,6 +11667,10 @@ input:focus, textarea:focus, select:focus {
   color: rgba(255,255,255,.76);
   font-size: 14px;
   font-weight: 850;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .album-lightbox-tags {
@@ -11579,7 +11690,7 @@ input:focus, textarea:focus, select:focus {
 
 .album-lightbox-meta section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .album-lightbox-meta h3 {
@@ -11591,7 +11702,7 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   grid-template-columns: minmax(105px, .78fr) minmax(0, 1fr);
   align-items: start;
-  gap: 12px;
+  gap: 10px;
   color: rgba(255,255,255,.78);
   font-size: 13px;
   font-weight: 900;
@@ -11696,20 +11807,35 @@ input:focus, textarea:focus, select:focus {
   }
 
   .album-global-lightbox {
-    --album-lightbox-thumbs-height: 78px;
+    --album-lightbox-thumbs-height: 0px;
   }
 
   .album-global-lightbox .yarl__slide {
-    padding: 0 0 var(--album-lightbox-thumbs-height);
+    align-items: center;
+    justify-content: center;
+    padding: 0;
   }
 
   .album-global-lightbox .yarl__slide_image {
-    max-height: calc(100dvh - var(--album-lightbox-thumbs-height)) !important;
+    width: 100vw !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-position: center center;
+  }
+
+  .album-global-lightbox.is-wide .yarl__slide_image {
+    width: 100vw !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: contain;
   }
 
   .album-global-lightbox .yarl__toolbar {
     right: 0;
-    padding: max(10px, env(safe-area-inset-top)) 10px 10px;
+    top: max(10px, env(safe-area-inset-top));
+    padding: 0 10px 10px;
   }
 
   .album-global-lightbox .yarl__navigation_next {
@@ -11721,7 +11847,7 @@ input:focus, textarea:focus, select:focus {
   }
 
   .album-global-lightbox .yarl__thumbnails_container {
-    display: block;
+    display: none;
     right: 0;
     min-height: var(--album-lightbox-thumbs-height);
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
@@ -11741,7 +11867,7 @@ input:focus, textarea:focus, select:focus {
     top: calc(max(12px, env(safe-area-inset-top)) + 52px);
     left: 10px;
     right: 10px;
-    bottom: calc(var(--album-lightbox-thumbs-height) + 10px);
+    bottom: 10px;
     z-index: 8;
     width: auto;
     height: auto;

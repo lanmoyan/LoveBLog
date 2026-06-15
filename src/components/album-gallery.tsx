@@ -26,8 +26,7 @@ import {
   Zap
 } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import Lightbox, { type ControllerRef } from 'yet-another-react-lightbox';
-import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
+import Lightbox from 'yet-another-react-lightbox';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import { formatDate } from '@/lib/dates';
 import { imageVariantUrl } from '@/lib/image-variants';
@@ -64,6 +63,7 @@ type AlbumImageMeta = {
   longitude?: string;
   gps?: string;
   gps_decimal?: string;
+  file_size_bytes?: number | string;
 };
 
 type AlbumImage = {
@@ -166,6 +166,9 @@ function rawTakenAt(image: AlbumImage) {
 function parsePhotoDate(value: unknown) {
   const raw = String(value || '').trim();
   if (!raw) return null;
+  const nativeDate = new Date(raw);
+  if (!Number.isNaN(nativeDate.getTime())) return nativeDate;
+
   const normalized = raw
     .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
     .replace(/^(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3')
@@ -182,8 +185,9 @@ function photoTime(image: AlbumImage) {
 }
 
 function takenAt(image: AlbumImage) {
-  const raw = rawTakenAt(image);
-  return raw ? String(raw) : formatDate(image.createdAt);
+  const date = parsePhotoDate(rawTakenAt(image));
+  if (date) return formatPhotoDate(date);
+  return formatDate(image.createdAt);
 }
 
 function pad(value: number) {
@@ -193,6 +197,10 @@ function pad(value: number) {
 function dateStamp(image: AlbumImage) {
   const date = parsePhotoDate(rawTakenAt(image));
   if (!date) return takenAt(image);
+  return formatPhotoDate(date);
+}
+
+function formatPhotoDate(date: Date) {
   return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -227,16 +235,12 @@ function relativeTimeLabel(values: unknown[]) {
   return `${Math.max(1, Math.floor(days / 365))} 年前`;
 }
 
-function metaValue(value: unknown, fallback = '暂无') {
-  return cleanText(value) || fallback;
-}
-
 function coordinateText(meta: AlbumImageMeta = {}) {
   return meta.gps || [meta.latitude, meta.longitude].filter(Boolean).join(' ') || meta.gps_decimal || '';
 }
 
 function resolutionText(meta: AlbumImageMeta, dimensions: string) {
-  return dimensions || (meta.pixel_width && meta.pixel_height ? `${meta.pixel_width} x ${meta.pixel_height}` : '');
+  return meta.pixel_width && meta.pixel_height ? `${meta.pixel_width} x ${meta.pixel_height}` : dimensions;
 }
 
 function megapixelsText(value: string) {
@@ -283,6 +287,17 @@ function photoSpecs(meta: AlbumImageMeta = {}) {
     meta.exposure,
     meta.iso ? `ISO ${String(meta.iso).replace(/^ISO\s*/i, '')}` : ''
   ].filter(Boolean);
+}
+
+function formatMetaBytes(value: unknown) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+  if (amount < 1024 * 1024) return `${Math.max(1, Math.round(amount / 1024))} KB`;
+  return `${(amount / 1024 / 1024).toFixed(amount < 10 * 1024 * 1024 ? 2 : 1)} MB`;
+}
+
+function fileSizeText(image: AlbumImage, meta: AlbumImageMeta = {}) {
+  return cleanText(image.fileSize) || formatMetaBytes(meta.file_size_bytes);
 }
 
 function photoTitle(image: AlbumImage, index: number) {
@@ -456,12 +471,30 @@ function buildAlbumGroups(items: PhotoItem[], siteTitle: string): AlbumGroup[] {
   return [allAlbum, ...groupedAlbums];
 }
 
-function MetaRow({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
+type MetaItem = { icon: ReactNode; label: string; value: ReactNode };
+
+function metaItem(icon: ReactNode, label: string, value: unknown): MetaItem | null {
+  const text = typeof value === 'string' || typeof value === 'number' ? cleanText(value) : value;
+  if (text === null || typeof text === 'undefined' || text === false || text === '') return null;
+  return { icon, label, value: text as ReactNode };
+}
+
+function MetaRow({ icon, label, value }: MetaItem) {
   return (
     <div className="album-meta-row">
       <span>{icon}{label}</span>
-      <b>{value || '暂无'}</b>
+      <b>{value}</b>
     </div>
+  );
+}
+
+function MetaSection({ title, rows }: { title: string; rows: MetaItem[] }) {
+  if (!rows.length) return null;
+  return (
+    <section>
+      <h3>{title}</h3>
+      {rows.map((row) => <MetaRow key={`${title}-${row.label}`} {...row} />)}
+    </section>
   );
 }
 
@@ -680,6 +713,8 @@ function PhotoTile({
   const mood = cleanText(image.mood);
   const tags = normalizeTags(image.tags);
   const specs = photoSpecs(meta);
+  const resolution = resolutionText(meta, dimensions[key] || '');
+  const basics = [resolution, fileSizeText(image, meta)].filter(Boolean);
   const ratio = Math.max(.78, Math.min(1.55, dimensionRatio(image, dimensions, index)));
 
   return (
@@ -708,7 +743,11 @@ function PhotoTile({
             </span>
           )}
           {camera && <em className="album-hover-camera"><Smartphone size={14} />{camera}</em>}
-          {specs.length > 0 && <span className="album-hover-specs">{specs.join('  ')}</span>}
+          {(specs.length > 0 || basics.length > 0) && (
+            <span className="album-hover-specs">
+              {[...specs, ...basics].join(' · ')}
+            </span>
+          )}
         </span>
       </button>
     </article>
@@ -1164,8 +1203,6 @@ function AlbumLightbox({
   onClose: () => void;
   onChange: (index: number) => void;
 }) {
-  const controllerRef = useRef<ControllerRef | null>(null);
-  const wheelLockRef = useRef(0);
   const [showMobileMeta, setShowMobileMeta] = useState(false);
   const activeItem = items[activeIndex];
   const active = activeItem?.image;
@@ -1195,28 +1232,6 @@ function AlbumLightbox({
     setShowMobileMeta(false);
   }, [activeIndex]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    function onWheel(event: WheelEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('.album-yarl-meta')) return;
-      if (Math.abs(event.deltaY) < 24 && Math.abs(event.deltaX) < 24) return;
-
-      event.preventDefault();
-      const now = Date.now();
-      if (now - wheelLockRef.current < 360) return;
-      wheelLockRef.current = now;
-
-      const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-      if (delta > 0) controllerRef.current?.next();
-      else controllerRef.current?.prev();
-    }
-
-    window.addEventListener('wheel', onWheel, { passive: false });
-    return () => window.removeEventListener('wheel', onWheel);
-  }, []);
-
   if (!active) return null;
 
   return (
@@ -1226,32 +1241,17 @@ function AlbumLightbox({
       close={onClose}
       index={activeIndex}
       slides={slides}
-      plugins={[Zoom, Thumbnails]}
+      plugins={[Zoom]}
       styles={{ root: lightboxStyle }}
       carousel={{
         finite: items.length <= 1,
         imageFit: 'contain'
       }}
-      controller={{
-        ref: controllerRef,
-        touchAction: 'none'
-      }}
-      thumbnails={{
-        position: 'bottom',
-        width: 64,
-        height: 64,
-        border: 2,
-        borderRadius: 8,
-        padding: 3,
-        gap: 10,
-        imageFit: 'contain',
-        vignette: true,
-        showToggle: false
-      }}
+      controller={{ touchAction: 'none' }}
       zoom={{
         maxZoomPixelRatio: 3,
         zoomInMultiplier: 2,
-        scrollToZoom: false
+        scrollToZoom: true
       }}
       on={{
         view: ({ index }) => onChange(index)
@@ -1300,6 +1300,36 @@ function LightboxMetaPanel({
   const tags = normalizeTags(image.tags);
   const resolution = resolutionText(meta, dimensions[key] || '');
   const megapixels = megapixelsText(resolution);
+  const fileSize = fileSizeText(image, meta);
+  const coordinates = coordinateText(meta);
+  const basicRows = [
+    metaItem(<FileImage size={16} />, '文件名', image.fileName),
+    metaItem(<Info size={16} />, '文件大小', fileSize),
+    metaItem(<ImageIcon size={16} />, '分辨率', resolution),
+    metaItem(<ImageIcon size={16} />, '像素', megapixels),
+    metaItem(<CalendarDays size={16} />, '拍摄时间', takenAt(image)),
+    metaItem(<Smartphone size={16} />, '设备', camera),
+    metaItem(<MapPin size={16} />, '坐标', coordinates),
+    metaItem(<Info size={16} />, '色彩空间', meta.color_space)
+  ].filter((row): row is MetaItem => Boolean(row));
+  const exposureRows = [
+    metaItem(<Camera size={16} />, '焦距', meta.focal_length),
+    metaItem(<Aperture size={16} />, '光圈', meta.aperture),
+    metaItem(<Clock3 size={16} />, '曝光时间', meta.exposure),
+    metaItem(<Zap size={16} />, 'ISO', meta.iso),
+    metaItem(<Info size={16} />, '曝光程序', meta.exposure_program),
+    metaItem(<Info size={16} />, '测光模式', meta.metering_mode),
+    metaItem(<Zap size={16} />, '闪光灯', meta.flash)
+  ].filter((row): row is MetaItem => Boolean(row));
+  const deviceRows = [
+    metaItem(<Smartphone size={16} />, '相机', camera),
+    metaItem(<Aperture size={16} />, '最大光圈', meta.max_aperture),
+    metaItem(<Camera size={16} />, '35mm 等效', meta.focal_length_35mm),
+    metaItem(<Info size={16} />, '软件', meta.software),
+    metaItem(<Info size={16} />, '方向', meta.orientation),
+    metaItem(<Info size={16} />, '白平衡', meta.white_balance),
+    metaItem(<Info size={16} />, '像素密度', resolutionUnitText(meta))
+  ].filter((row): row is MetaItem => Boolean(row));
 
   return (
     <aside className={`album-lightbox-meta album-yarl-meta${mobileOpen ? ' is-open' : ''}`}>
@@ -1314,51 +1344,9 @@ function LightboxMetaPanel({
         )}
       </div>
 
-      <section>
-        <h3>基本信息</h3>
-        <MetaRow icon={<FileImage size={16} />} label="文件名" value={metaValue(image.fileName)} />
-        <MetaRow icon={<Info size={16} />} label="文件大小" value={metaValue(image.fileSize)} />
-        <MetaRow icon={<ImageIcon size={16} />} label="分辨率" value={metaValue(resolution)} />
-        <MetaRow icon={<ImageIcon size={16} />} label="像素" value={metaValue(megapixels)} />
-        <MetaRow icon={<CalendarDays size={16} />} label="拍摄时间" value={metaValue(takenAt(image))} />
-        <MetaRow icon={<Info size={16} />} label="色彩空间" value={metaValue(meta.color_space)} />
-        <MetaRow icon={<Smartphone size={16} />} label="设备" value={metaValue(camera)} />
-        <MetaRow icon={<MapPin size={16} />} label="坐标" value={metaValue(coordinateText(meta), '暂无坐标')} />
-      </section>
-
-      <section>
-        <h3>拍摄参数</h3>
-        <MetaRow icon={<Camera size={16} />} label="焦距" value={metaValue(meta.focal_length)} />
-        <MetaRow icon={<Aperture size={16} />} label="光圈" value={metaValue(meta.aperture)} />
-        <MetaRow icon={<Clock3 size={16} />} label="曝光时间" value={metaValue(meta.exposure)} />
-        <MetaRow icon={<Zap size={16} />} label="ISO" value={metaValue(meta.iso)} />
-      </section>
-
-      <section>
-        <h3>设备信息</h3>
-        <MetaRow icon={<Smartphone size={16} />} label="相机" value={metaValue(camera)} />
-        <MetaRow icon={<Aperture size={16} />} label="最大光圈" value={metaValue(meta.max_aperture)} />
-        <MetaRow icon={<Camera size={16} />} label="35mm 等效" value={metaValue(meta.focal_length_35mm)} />
-        <MetaRow icon={<Info size={16} />} label="软件" value={metaValue(meta.software)} />
-        <MetaRow icon={<Info size={16} />} label="方向" value={metaValue(meta.orientation)} />
-      </section>
-
-      <section>
-        <h3>拍摄模式</h3>
-        <MetaRow icon={<Info size={16} />} label="白平衡" value={metaValue(meta.white_balance)} />
-        <MetaRow icon={<Info size={16} />} label="曝光程序" value={metaValue(meta.exposure_program)} />
-        <MetaRow icon={<Info size={16} />} label="曝光模式" value={metaValue(meta.exposure_mode)} />
-        <MetaRow icon={<Info size={16} />} label="测光模式" value={metaValue(meta.metering_mode)} />
-        <MetaRow icon={<Zap size={16} />} label="闪光灯" value={metaValue(meta.flash)} />
-      </section>
-
-      <section>
-        <h3>技术参数</h3>
-        <MetaRow icon={<Info size={16} />} label="亮度" value={metaValue(meta.brightness)} />
-        <MetaRow icon={<Info size={16} />} label="数码变焦" value={metaValue(meta.digital_zoom_ratio)} />
-        <MetaRow icon={<Info size={16} />} label="感光方式" value={metaValue(meta.sensing_method)} />
-        <MetaRow icon={<ImageIcon size={16} />} label="像素密度" value={metaValue(resolutionUnitText(meta))} />
-      </section>
+      <MetaSection title="基本信息" rows={basicRows} />
+      <MetaSection title="拍摄参数" rows={exposureRows} />
+      <MetaSection title="设备信息" rows={deviceRows} />
     </aside>
   );
 }

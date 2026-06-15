@@ -54,8 +54,8 @@ function compact(value: string) {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function excerpt(value: string, fallback = '') {
-  return compact(value || fallback).slice(0, 120);
+function excerpt(value: string, fallback = '', limit = 120) {
+  return compact(value || fallback).slice(0, limit);
 }
 
 function uniqueTokens(tokens: string[]) {
@@ -224,7 +224,7 @@ export async function GET(request: Request) {
       type: 'story',
       label: '故事',
       title: item.title,
-      excerpt: excerpt(item.excerpt || item.content),
+      excerpt: excerpt(item.excerpt || item.content, '', 82),
       content: `${item.title} ${item.excerpt} ${item.content} ${item.tags.join(' ')} ${item.author.displayName}`,
       href: `/stories/${item.slug}/`,
       date: formatDateTime(item.publishedAt || item.createdAt),

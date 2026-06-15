@@ -22,8 +22,8 @@ import {
   UserRound,
   X
 } from 'lucide-react';
-import type { FocusEvent } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import type { FocusEvent, UIEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { brandIcon } from '@/lib/routes';
 import { GlobalSearch } from '@/components/global-search';
 import type { SiteSnapshot } from '@/lib/site';
@@ -98,6 +98,8 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
+  const [deviceDockVisible, setDeviceDockVisible] = useState(false);
+  const deviceConsoleRef = useRef<HTMLDivElement | null>(null);
   const consoleData = snapshot.console;
 
   const totalStoryYears = useMemo(
@@ -138,6 +140,18 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
     };
   }, [consoleOpen]);
 
+  useEffect(() => {
+    if (!consoleOpen) {
+      setDeviceDockVisible(false);
+      return;
+    }
+
+    setDeviceDockVisible(false);
+    window.requestAnimationFrame(() => {
+      if (deviceConsoleRef.current) deviceConsoleRef.current.scrollTop = 0;
+    });
+  }, [consoleOpen]);
+
   function closeConsole() {
     setConsoleClosing(true);
     window.setTimeout(() => {
@@ -171,6 +185,13 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
     }
     const story = stories[Math.floor(Math.random() * stories.length)];
     router.push(story.href);
+  }
+
+  function updateDeviceDock(event: UIEvent<HTMLDivElement>) {
+    const target = event.currentTarget;
+    const hasScrolled = target.scrollTop > 72;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 160;
+    setDeviceDockVisible(hasScrolled || nearBottom);
   }
 
   function activeGroup(items: readonly { href: string }[]) {
@@ -337,7 +358,7 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
           </footer>
         </div>
 
-        <div className="console-device-view">
+        <div className="console-device-view" ref={deviceConsoleRef} onScroll={updateDeviceDock}>
           <header className="device-console-head">
             <Link className="device-console-brand" href="/" title="返回首页" onClick={() => setConsoleOpen(false)}>
               <span><BrandIcon size={18} /></span>
@@ -462,7 +483,7 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
             </div>
           </section>
 
-          <footer className="device-console-dock">
+          <footer className={deviceDockVisible ? 'device-console-dock is-visible' : 'device-console-dock'}>
             <button type="button" onClick={randomStory} aria-label="随机故事"><Shuffle size={17} /></button>
             <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? '切换到日间模式' : '切换到夜间模式'}><Sparkles size={17} /></button>
             <Link href="/comment/" onClick={() => setConsoleOpen(false)} aria-label="评论"><MessageCircle size={17} /></Link>
