@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  email        String?   @unique
+  passwordHash String    @map("password_hash")
+  displayName  String    @map("display_name")
+  avatar       String    @default("")
+  avatarImage  String    @default("") @map("avatar_image")
+  partnerId    Int?      @unique @map("partner_id")
+  roleKey      String    @default("user") @map("role_key")
+  status       String    @default("active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  partner      User?     @relation("UserPartner", fields: [partnerId], references: [id], onDelete: SetNull)
+  partneredBy  User?     @relation("UserPartner")
+  posts        Post[]
+  likes        Like[]
+  comments     Comment[]
+  messages     Message[]
+  blogPosts    BlogPost[]
+  oauthAccounts UserOAuthAccount[]
+
+  @@map("users")
+}
+
+model UserOAuthAccount {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @map("user_id")
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  email             String?
+  name              String   @default("")
+  avatar            String   @default("")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("user_oauth_accounts")
+}
+
+model EmailVerificationCode {
+  id         Int       @id @default(autoincrement())
+  email      String
+  codeHash   String    @map("code_hash")
+  purpose    String    @default("register")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, purpose, createdAt])
+  @@index([expiresAt])
+  @@map("email_verification_codes")
+}
+
+model Post {
+  id        Int         @id @default(autoincrement())
+  authorId  Int         @map("author_id")
+  content   String      @default("")
+  mood      String      @default("")
+  video     String      @default("")
+  createdAt DateTime    @default(now()) @map("created_at")
+  author    User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images    PostImage[]
+  likes     Like[]
+  comments  Comment[]
+
+  @@index([createdAt, id])
+  @@index([authorId, createdAt])
+  @@index([mood])
+  @@map("posts")
+}
+
+model PostImage {
+  id     Int    @id @default(autoincrement())
+  postId Int    @map("post_id")
+  path   String
+  sort   Int    @default(0)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sort])
+  @@map("post_images")
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId, createdAt])
+  @@map("likes")
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  postId    Int       @map("post_id")
+  userId    Int?      @map("user_id")
+  guestQq   String?   @map("guest_qq")
+  guestNick String?   @map("guest_nick")
+  parentId  Int?      @map("parent_id")
+  content   String
+  ip        String?
+  region    String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@index([userId, createdAt])
+  @@map("comments")
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  content   String
+  color     String   @default("#fff4f6")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt, id])
+  @@index([userId, createdAt])
+  @@map("messages")
+}
+
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+model GuestbookEntry {
+  id        Int      @id @default(autoincrement())
+  qq        String
+  nickname  String   @default("")
+  content   String
+  approved  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("guestbook")
+}
+
+model WishlistItem {
+  id        Int       @id @default(autoincrement())
+  content   String
+  done      Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  doneAt    DateTime? @map("done_at")
+  displayAt DateTime? @map("display_at")
+  noteStyle String    @default("paper") @map("note_style")
+  noteColor String    @default("") @map("note_color")
+  textColor String    @default("") @map("text_color")
+
+  @@index([done, createdAt, id])
+  @@index([displayAt])
+  @@map("wishlist")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  date        String
+  title       String
+  description String   @default("")
+  image       String   @default("")
+  imageMeta   String   @default("{}") @map("image_meta")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([date, id])
+  @@map("events")
+}
+
+model BlogPost {
+  id          Int      @id @default(autoincrement())
+  authorId    Int      @map("author_id")
+  slug        String   @unique
+  title       String
+  excerpt     String   @default("")
+  content     String
+  coverImage  String   @default("") @map("cover_image")
+  tags        String   @default("[]")
+  visibility  String   @default("public")
+  pinned      Int      @default(0)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([publishedAt])
+  @@index([pinned, createdAt])
+  @@index([visibility, publishedAt])
+  @@index([authorId, createdAt])
+  @@map("blog_posts")
+}
+
+model VisitEvent {
+  id           Int      @id @default(autoincrement())
+  sessionId    String   @map("session_id")
+  path         String
+  title        String   @default("")
+  referrer     String   @default("")
+  durationMs   Int      @default(0) @map("duration_ms")
+  region       String   @default("")
+  deviceType   String   @default("电脑端") @map("device_type")
+  deviceDetail String   @default("") @map("device_detail")
+  browser      String   @default("")
+  os           String   @default("")
+  userAgent    String   @default("") @map("user_agent")
+  ipHash       String   @default("") @map("ip_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([sessionId, path])
+  @@index([createdAt])
+  @@index([path, createdAt])
+  @@map("visit_events")
+}
