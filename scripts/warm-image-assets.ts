@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { prisma } from '../src/lib/prisma';
-import { getSetting, normalizeHomeAlbumImages, safeJson } from '../src/lib/settings';
+import { getSetting } from '../src/lib/settings';
 import { cacheStoredUploadImage } from '../src/lib/upload-storage';
 
 function addPath(paths: Set<string>, value: unknown) {
@@ -12,12 +12,11 @@ function addPath(paths: Set<string>, value: unknown) {
 
 async function collectImagePaths() {
   const paths = new Set<string>();
-  const [users, postImages, events, stories, homeAlbumJson, siteIcon] = await Promise.all([
+  const [users, postImages, events, stories, siteIcon] = await Promise.all([
     prisma.user.findMany({ select: { avatarImage: true } }),
     prisma.postImage.findMany({ select: { path: true } }),
     prisma.event.findMany({ select: { image: true } }),
     prisma.blogPost.findMany({ select: { coverImage: true } }),
-    getSetting('home_album_images', '[]'),
     getSetting('site_icon', '')
   ]);
 
@@ -25,7 +24,6 @@ async function collectImagePaths() {
   postImages.forEach((image) => addPath(paths, image.path));
   events.forEach((event) => addPath(paths, event.image));
   stories.forEach((story) => addPath(paths, story.coverImage));
-  normalizeHomeAlbumImages(safeJson(homeAlbumJson, [])).forEach((image) => addPath(paths, image.path));
   addPath(paths, siteIcon);
 
   for (const baseDir of ['uploads', path.join('public', 'uploads')]) {

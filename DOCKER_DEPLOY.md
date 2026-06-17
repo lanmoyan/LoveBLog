@@ -1,6 +1,12 @@
 # Docker Compose Deployment
 
-This folder is ready to copy to a server and run with Docker Compose.
+This project publishes a production image to GitHub Container Registry:
+
+```text
+ghcr.io/lanmoyan/loveblog:latest
+```
+
+The default `docker-compose.yml` can run from that image, while still keeping `build: .` as a local-build fallback.
 
 ## 1. Prepare environment
 
@@ -48,13 +54,20 @@ QQ and WeChat entries are reserved in the admin UI. They need platform approval 
 
 Keep auth secrets stable after deployment, otherwise existing login sessions become invalid.
 
-## 2. Start
+## 2. First start
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 The app listens on port `3000` by default. PostgreSQL starts as a sibling service and migrations run automatically unless `RUN_MIGRATIONS=0`.
+
+If GHCR says the image is private, open the repository package page on GitHub and set package visibility to public, or log in on the server:
+
+```bash
+echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
 
 ## 3. Persistent data
 
@@ -68,5 +81,32 @@ If you use S3 / Cloudflare R2, back up PostgreSQL and your object-storage bucket
 docker compose logs -f
 docker compose ps
 docker compose down
+docker compose pull
+docker compose up -d
+docker image prune -f
+```
+
+## 5. Upgrade to the latest image
+
+After new code is pushed to `main`, wait for the `Docker Image` GitHub Actions workflow to finish, then run on the server:
+
+```bash
+cd /path/to/your/deploy-folder
+docker compose pull love-next
+docker compose up -d love-next
+docker compose logs -f love-next
+```
+
+If you also changed `docker-compose.yml` or `.env.docker.example`, pull the latest repository files first:
+
+```bash
+git pull origin main
+docker compose pull
+docker compose up -d
+```
+
+Local build fallback:
+
+```bash
 docker compose up -d --build
 ```

@@ -3,8 +3,6 @@ import type { ReactNode } from 'react';
 import { Shell } from '@/components/shell';
 import { getSettingMap } from '@/lib/settings';
 import { publicUploadUrl } from '@/lib/uploads';
-import 'yet-another-react-lightbox/styles.css';
-import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import './globals.css';
 
 const themeInitScript = `

@@ -10,14 +10,6 @@ export const DEFAULT_EMOJI_PACKS = [
 
 export type EmojiItem = string | { label: string; url: string; text?: string };
 export type EmojiPack = { name: string; items: EmojiItem[] };
-export type HomeAlbumImage = {
-  path: string;
-  title?: string;
-  description?: string;
-  tags?: string[];
-  mood?: string;
-  createdAt?: string;
-};
 
 export function safeJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -85,48 +77,6 @@ export function normalizeEmojiPacks(value: unknown): EmojiPack[] {
     })
     .filter((pack) => pack.name && pack.items.length);
   return packs.length ? packs : DEFAULT_EMOJI_PACKS.map((pack) => ({ name: pack.name, items: [...pack.items] }));
-}
-
-function cleanAlbumText(value: unknown, maxLength: number) {
-  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
-}
-
-export function normalizeAlbumTags(value: unknown) {
-  const rawTags = Array.isArray(value)
-    ? value
-    : String(value || '').split(/[\n,，、#]+/);
-  return Array.from(new Set(
-    rawTags
-      .map((item) => cleanAlbumText(item, 18))
-      .filter(Boolean)
-  )).slice(0, 8);
-}
-
-export function normalizeHomeAlbumImages(value: unknown): HomeAlbumImage[] {
-  const raw = Array.isArray(value) ? value : [];
-  return raw
-    .slice(0, 48)
-    .map((item): HomeAlbumImage | null => {
-      if (typeof item === 'string') {
-        const path = cleanImageUrl(item);
-        return path ? { path } : null;
-      }
-
-      if (!item || typeof item !== 'object') return null;
-      const record = item as Record<string, unknown>;
-      const path = cleanImageUrl(record.path || record.url || record.src || record.image);
-      if (!path) return null;
-      const createdAt = cleanAlbumText(record.createdAt || record.created_at, 40);
-      return {
-        path,
-        title: cleanAlbumText(record.title, 60),
-        description: cleanAlbumText(record.description || record.copy || record.text, 180),
-        tags: normalizeAlbumTags(record.tags),
-        mood: cleanAlbumText(record.mood, 24),
-        createdAt
-      };
-    })
-    .filter((item): item is HomeAlbumImage => !!item);
 }
 
 export function parseImageUrls(value: unknown) {

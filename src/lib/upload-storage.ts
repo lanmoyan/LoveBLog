@@ -7,7 +7,7 @@ import { normalizeImageAssetPath, removeImageAsset, upsertImageAsset } from '@/l
 import { uploadNameFromPublicPath } from '@/lib/uploads';
 
 const uploadPathPrefix = '/api/uploads/';
-const managedUploadNamePattern = /^(?:upload|post|video|story-cover|event|home-album|site-icon|avatar-\d+)-\d{10,}-\d{1,10}\.(?:jpe?g|png|webp|gif|ico|mp4|webm|mov)$/i;
+const managedUploadNamePattern = /^(?:upload|post|video|story-cover|event|site-icon|avatar-\d+)-\d{10,}-\d{1,10}\.(?:jpe?g|png|webp|gif|ico|mp4|webm|mov)$/i;
 
 class UploadError extends Error {
   expose = true;

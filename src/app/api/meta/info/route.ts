@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdminUser } from '@/lib/auth';
-import { getSettingMap, normalizeHomeAlbumImages, readEmojiPacksFromMap, safeJson, setSetting } from '@/lib/settings';
+import { getSettingMap, readEmojiPacksFromMap, safeJson, setSetting } from '@/lib/settings';
 import { cleanExternalUrl, cleanImageUrl, publicUploadUrl } from '@/lib/uploads';
 import { prisma } from '@/lib/prisma';
 import { jsonError } from '@/lib/responses';
@@ -94,10 +94,6 @@ export async function GET() {
     siteIcon: publicUploadUrl(settings.get('site_icon') || '/site-icon.svg'),
     togetherSince: settings.get('together_since') || '',
     specialDates: safeJson(settings.get('special_dates'), []),
-    homeAlbumImages: normalizeHomeAlbumImages(safeJson(settings.get('home_album_images'), [])).map((image) => ({
-      ...image,
-      path: publicUploadUrl(image.path)
-    })),
     imageMetaEnabled: settings.get('image_meta_enabled') !== '0',
     twikooEnvId: settings.get('twikoo_env_id') || process.env.NEXT_PUBLIC_TWIKOO_ENV_ID || '',
     twikooRegion,

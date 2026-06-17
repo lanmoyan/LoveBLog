@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpenText, Bot, CalendarHeart, ImageIcon, MessageCircle, PenLine, Target } from 'lucide-react';
+import { BookOpenText, Bot, CalendarHeart, MessageCircle, PenLine, Target } from 'lucide-react';
 import Link from 'next/link';
 import { imageVariantUrl } from '@/lib/image-variants';
 import type { SiteSnapshot } from '@/lib/site';
@@ -56,13 +56,6 @@ export function HomeDashboard({ snapshot, days, latestPost, latestEvent }: Props
       icon: CalendarHeart
     },
     {
-      href: '/album/',
-      title: '相册',
-      copy: '照片墙、首页轮播和外部图库集中管理。',
-      metric: `${snapshot.homeAlbumImages.length} 张首页图`,
-      icon: ImageIcon
-    },
-    {
       href: '/wishlist/',
       title: '心愿',
       copy: `完成 ${snapshot.wishlist.filter((item) => item.done).length} / ${snapshot.counts.wishlist}，继续把想做的事点亮。`,
@@ -84,7 +77,7 @@ export function HomeDashboard({ snapshot, days, latestPost, latestEvent }: Props
         <div className="magazine-copy">
           <p className="page-kicker">LOVE YOU FOREVER</p>
           <h2>欢迎来到爱情故事站</h2>
-          <p>这里保存每位成员的说说、故事、相册、心愿和悄悄话。</p>
+          <p>这里保存每位成员的说说、故事、心愿和悄悄话。</p>
           <div className="magazine-stats" aria-label="站点数据">
             <span><b>{days}</b> 天运行</span>
             <span><b>{snapshot.visits}</b> 次访问</span>

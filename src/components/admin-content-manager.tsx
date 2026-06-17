@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { useAppDialogs } from '@/components/app-dialogs';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { MediaDropzone } from '@/components/media-dropzone';
 import { useSession } from '@/components/session-provider';
@@ -121,8 +122,98 @@ function imageUrlsFrom(value: any) {
     .join('\n');
 }
 
+function normalizeComparable(value: unknown) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeMediaUrl(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw, 'https://local.invalid');
+    const localPath = url.pathname.startsWith('/api/uploads/') || url.pathname.startsWith('/uploads/') ? url.pathname : '';
+    if (localPath) return localPath.replace(/^\/uploads\//, '/api/uploads/');
+    return url.origin === 'https://local.invalid' ? url.pathname : url.toString().replace(/\/$/, '');
+  } catch {
+    return raw;
+  }
+}
+
+function mediaValuesFrom(value: any) {
+  const rawValues = Array.isArray(value) ? value : value ? [value] : [];
+  return rawValues
+    .flatMap((item) => {
+      if (typeof item === 'string') {
+        const raw = item.trim();
+        if (!raw) return [];
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {
+          // keep plain newline/comma separated input
+        }
+        return raw.split(/\r?\n|,/);
+      }
+      return [item];
+    })
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      return item?.path || item?.url || item?.src || item?.image || '';
+    })
+    .map(normalizeMediaUrl)
+    .filter(Boolean)
+    .sort();
+}
+
+function contentSignature(view: AdminContentView, item: any) {
+  if (!item || typeof item !== 'object') return '';
+
+  if (view === 'posts') {
+    const content = normalizeComparable(item.content);
+    const mood = normalizeComparable(item.mood).slice(0, 16);
+    const images = mediaValuesFrom(item.imageUrls || item.image_urls || item.images).join('|');
+    const video = normalizeMediaUrl(item.video || item.videoUrl || item.video_url);
+    if (!content && !images && !video) return '';
+    return ['posts', content, mood, images, video].join('::');
+  }
+
+  if (view === 'stories') {
+    const title = normalizeComparable(item.title);
+    const content = normalizeComparable(item.content);
+    if (!title || !content) return '';
+    return ['stories', title, content].join('::');
+  }
+
+  if (view === 'events') {
+    const date = String(item.date || '').trim().slice(0, 10);
+    const title = normalizeComparable(item.title);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) return '';
+    return ['events', date, title, normalizeComparable(item.description)].join('::');
+  }
+
+  if (view === 'wishlist') {
+    const content = normalizeComparable(item.content);
+    return content ? ['wishlist', content].join('::') : '';
+  }
+
+  const content = normalizeComparable(item.content);
+  return content ? ['messages', content].join('::') : '';
+}
+
+function duplicateLabel(view: AdminContentView) {
+  if (view === 'posts') return '说说';
+  if (view === 'stories') return '故事';
+  if (view === 'events') return '时光碎片';
+  if (view === 'wishlist') return '心愿';
+  return '悄悄话';
+}
+
 export function AdminContentManager({ initialPosts, initialEvents, initialWishlist, emojiPacks, activeView = 'posts', canAdmin = false, scope = canAdmin ? 'all' : 'mine' }: AdminContentManagerProps) {
   const router = useRouter();
+  const dialogs = useAppDialogs();
   const { user } = useSession();
   const initialScopedPosts = canAdmin ? initialPosts : [];
   const initialScopedEvents = canAdmin ? initialEvents : [];
@@ -264,6 +355,14 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function submitPost() {
+    if (!postFiles.length && !postVideo) {
+      const images = postExistingMedia.images.concat(mediaValuesFrom(postUrls).map((path) => ({ path })));
+      if (findDuplicateItem('posts', { content: postForm.content, mood: postForm.mood, images, video: postExistingMedia.video }, postEditingId)) {
+        warnDuplicate('posts');
+        return;
+      }
+    }
+
     setPostBusy(true);
     try {
       const form = new FormData();
@@ -278,12 +377,18 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
           body: form
         });
         const data = await jsonBody(res);
-        if (!res.ok) return alert(data.error || '说说保存失败');
+        if (!res.ok) {
+          void dialogs.alert({ message: data.error || '说说保存失败', tone: 'danger' });
+          return;
+        }
         setPosts((current) => current.map((post) => post.id === postEditingId ? data.post : post));
       } else {
         const res = await fetch('/api/posts/', { method: 'POST', body: form });
         const data = await jsonBody(res);
-        if (!res.ok) return alert(data.error || '说说发布失败');
+        if (!res.ok) {
+          void dialogs.alert({ message: data.error || '说说发布失败', tone: 'danger' });
+          return;
+        }
         setPosts((current) => [data.post, ...current]);
       }
       resetPostForm();
@@ -304,7 +409,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         body: JSON.stringify(options.video ? { video: true } : { imageId: options.imageId })
       });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '媒体删除失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '媒体删除失败', tone: 'danger' });
+        return;
+      }
       setPosts((current) => current.map((post) => post.id === postEditingId ? data.post : post));
       setPostExistingMedia({
         images: Array.isArray(data.post?.images) ? data.post.images : [],
@@ -321,11 +429,16 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function deletePost(post: any, ask = true) {
-    if (ask && !confirm('确定删除这条说说吗？')) return false;
+    if (ask && !(await dialogs.confirm({
+      title: '删除说说',
+      message: '确定删除这条说说吗？删除后无法恢复。',
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return false;
     const res = await fetch(`/api/posts/${post.id}/`, { method: 'DELETE' });
     const data = await jsonBody(res);
     if (!res.ok) {
-      alert(data.error || '说说删除失败');
+      void dialogs.alert({ message: data.error || '说说删除失败', tone: 'danger' });
       return false;
     }
     setPosts((current) => current.filter((item) => item.id !== post.id));
@@ -370,6 +483,11 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function submitStory() {
+    if (findDuplicateItem('stories', storyForm, storyEditingId)) {
+      warnDuplicate('stories');
+      return;
+    }
+
     setStoryBusy(true);
     try {
       const form = new FormData();
@@ -387,7 +505,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         body: form
       });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '故事保存失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '故事保存失败', tone: 'danger' });
+        return;
+      }
       setStories((current) => storyEditingId
         ? current.map((story) => story.id === storyEditingId ? data.story : story)
         : [data.story, ...current]);
@@ -405,7 +526,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
     try {
       const res = await fetch(`/api/stories/${storyEditingId}/cover/`, { method: 'DELETE' });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '封面删除失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '封面删除失败', tone: 'danger' });
+        return;
+      }
       setStories((current) => current.map((story) => story.id === storyEditingId ? data.story : story));
       setStoryExistingCover(data.story?.coverImage || '');
       setStoryConfirmRemoveCover(false);
@@ -416,11 +540,16 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function deleteStory(story: any, ask = true) {
-    if (ask && !confirm('确定删除这篇故事吗？')) return false;
+    if (ask && !(await dialogs.confirm({
+      title: '删除故事',
+      message: '确定删除这篇故事吗？删除后无法恢复。',
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return false;
     const res = await fetch(`/api/stories/${story.id}/`, { method: 'DELETE' });
     const data = await jsonBody(res);
     if (!res.ok) {
-      alert(data.error || '故事删除失败');
+      void dialogs.alert({ message: data.error || '故事删除失败', tone: 'danger' });
       return false;
     }
     setStories((current) => current.filter((item) => item.id !== story.id));
@@ -447,6 +576,11 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function submitEvent() {
+    if (findDuplicateItem('events', eventForm, eventEditingId)) {
+      warnDuplicate('events');
+      return;
+    }
+
     setEventBusy(true);
     try {
       const form = new FormData();
@@ -460,7 +594,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         body: form
       });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '时光保存失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '时光保存失败', tone: 'danger' });
+        return;
+      }
       setEvents((current) => sortEvents(eventEditingId
         ? current.map((event) => event.id === eventEditingId ? data.event : event)
         : current.concat(data.event)));
@@ -478,7 +615,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
     try {
       const res = await fetch(`/api/events/${eventEditingId}/image/`, { method: 'DELETE' });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '图片删除失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '图片删除失败', tone: 'danger' });
+        return;
+      }
       setEvents((current) => sortEvents(current.map((event) => event.id === eventEditingId ? data.event : event)));
       setEventExistingImage(data.event?.image || '');
       setEventConfirmRemoveImage(false);
@@ -489,11 +629,16 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function deleteEvent(event: any, ask = true) {
-    if (ask && !confirm('确定删除这个时光碎片吗？')) return false;
+    if (ask && !(await dialogs.confirm({
+      title: '删除时光碎片',
+      message: '确定删除这个时光碎片吗？删除后无法恢复。',
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return false;
     const res = await fetch(`/api/events/${event.id}/`, { method: 'DELETE' });
     const data = await jsonBody(res);
     if (!res.ok) {
-      alert(data.error || '时光删除失败');
+      void dialogs.alert({ message: data.error || '时光删除失败', tone: 'danger' });
       return false;
     }
     setEvents((current) => current.filter((item) => item.id !== event.id));
@@ -514,6 +659,11 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function submitWish() {
+    if (findDuplicateItem('wishlist', wishForm)) {
+      warnDuplicate('wishlist');
+      return;
+    }
+
     setWishBusy(true);
     try {
       const res = await fetch('/api/meta/wishlist/', {
@@ -522,7 +672,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         body: JSON.stringify(wishForm)
       });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '心愿添加失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '心愿添加失败', tone: 'danger' });
+        return;
+      }
       setWishlist((current) => [data.item, ...current]);
       resetWishForm();
       setEditorView(null);
@@ -535,17 +688,25 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   async function toggleWish(item: any) {
     const res = await fetch(`/api/meta/wishlist/${item.id}/toggle/`, { method: 'PUT' });
     const data = await jsonBody(res);
-    if (!res.ok) return alert(data.error || '心愿状态更新失败');
+    if (!res.ok) {
+      void dialogs.alert({ message: data.error || '心愿状态更新失败', tone: 'danger' });
+      return;
+    }
     setWishlist((current) => current.map((wish) => wish.id === item.id ? data.item : wish));
     router.refresh();
   }
 
   async function deleteWish(item: any, ask = true) {
-    if (ask && !confirm('确定删除这个心愿吗？')) return false;
+    if (ask && !(await dialogs.confirm({
+      title: '删除心愿',
+      message: '确定删除这个心愿吗？删除后无法恢复。',
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return false;
     const res = await fetch(`/api/meta/wishlist/${item.id}/`, { method: 'DELETE' });
     const data = await jsonBody(res);
     if (!res.ok) {
-      alert(data.error || '心愿删除失败');
+      void dialogs.alert({ message: data.error || '心愿删除失败', tone: 'danger' });
       return false;
     }
     setWishlist((current) => current.filter((wish) => wish.id !== item.id));
@@ -559,6 +720,11 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function submitMessage() {
+    if (findDuplicateItem('messages', messageForm)) {
+      warnDuplicate('messages');
+      return;
+    }
+
     setMessageBusy(true);
     try {
       const res = await fetch('/api/meta/messages/', {
@@ -567,7 +733,10 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         body: JSON.stringify(messageForm)
       });
       const data = await jsonBody(res);
-      if (!res.ok) return alert(data.error || '悄悄话发布失败');
+      if (!res.ok) {
+        void dialogs.alert({ message: data.error || '悄悄话发布失败', tone: 'danger' });
+        return;
+      }
       setMessages((current) => [data.message, ...current]);
       resetMessageForm();
       setEditorView(null);
@@ -578,11 +747,16 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   async function deleteMessage(message: any, ask = true) {
-    if (ask && !confirm('确定删除这条悄悄话吗？')) return false;
+    if (ask && !(await dialogs.confirm({
+      title: '删除悄悄话',
+      message: '确定删除这条悄悄话吗？删除后无法恢复。',
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return false;
     const res = await fetch(`/api/meta/messages/${message.id}/`, { method: 'DELETE' });
     const data = await jsonBody(res);
     if (!res.ok) {
-      alert(data.error || '悄悄话删除失败');
+      void dialogs.alert({ message: data.error || '悄悄话删除失败', tone: 'danger' });
       return false;
     }
     setMessages((current) => current.filter((item) => item.id !== message.id));
@@ -618,6 +792,52 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function canCreateInView(view: AdminContentView) {
     return !!user && (canAdmin || view === 'posts' || view === 'stories' || view === 'messages');
+  }
+
+  function findDuplicateItem(view: AdminContentView, item: any, ignoreId?: number | null) {
+    const signature = contentSignature(view, item);
+    if (!signature) return false;
+    return getItems(view).some((existing) => {
+      if (ignoreId && Number(existing.id) === ignoreId) return false;
+      return contentSignature(view, existing) === signature;
+    });
+  }
+
+  function warnDuplicate(view: AdminContentView) {
+    void dialogs.alert({
+      title: '发现重复内容',
+      message: `${duplicateLabel(view)}中已存在相同内容，已取消保存。`,
+      tone: 'warning'
+    });
+  }
+
+  function buildImportPlan(view: AdminContentView, items: any[]) {
+    const existingSignatures = new Set(getItems(view).map((item) => contentSignature(view, item)).filter(Boolean));
+    const importSignatures = new Set<string>();
+    const nextItems: any[] = [];
+    let skippedExisting = 0;
+    let skippedRepeated = 0;
+    let skippedInvalid = 0;
+
+    for (const item of items) {
+      const signature = contentSignature(view, item);
+      if (!signature) {
+        skippedInvalid += 1;
+        continue;
+      }
+      if (existingSignatures.has(signature)) {
+        skippedExisting += 1;
+        continue;
+      }
+      if (importSignatures.has(signature)) {
+        skippedRepeated += 1;
+        continue;
+      }
+      importSignatures.add(signature);
+      nextItems.push(item);
+    }
+
+    return { items: nextItems, skippedExisting, skippedRepeated, skippedInvalid };
   }
 
   function toggleSelected(view: AdminContentView, id: number, checked: boolean) {
@@ -778,17 +998,43 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
     try {
       const parsed = JSON.parse(await file.text());
       const items = itemsFromImport(view, parsed);
-      if (!items.length) return alert('没有识别到可导入的内容，请选择导出的 JSON 文件。');
-      if (!confirm(`将新增导入 ${items.length} 条内容，不会覆盖现有数据，继续吗？`)) return;
+      if (!items.length) {
+        void dialogs.alert({ message: '没有识别到可导入的内容，请选择导出的 JSON 文件。', tone: 'warning' });
+        return;
+      }
+      const plan = buildImportPlan(view, items);
+      const skippedBeforeImport = plan.skippedExisting + plan.skippedRepeated + plan.skippedInvalid;
+      if (!plan.items.length) {
+        void dialogs.alert({
+          title: '没有新内容',
+          message: `共读取 ${items.length} 条内容，已存在 ${plan.skippedExisting} 条，文件内重复 ${plan.skippedRepeated} 条，无效 ${plan.skippedInvalid} 条。`,
+          tone: 'warning'
+        });
+        return;
+      }
+      if (!(await dialogs.confirm({
+        title: '导入内容',
+        message: `共读取 ${items.length} 条内容，将导入 ${plan.items.length} 条新内容，跳过 ${skippedBeforeImport} 条重复或无效内容。继续吗？`,
+        confirmText: '开始导入',
+        tone: 'info'
+      }))) return;
       let imported = 0;
-      for (const item of items) {
+      let failed = 0;
+      for (const item of plan.items) {
         if (await importItem(view, item)) imported += 1;
+        else failed += 1;
       }
       await reloadActiveView(view);
       router.refresh();
-      alert(`已导入 ${imported} 条内容${imported < items.length ? `，${items.length - imported} 条被跳过` : ''}`);
+      void dialogs.alert({
+        message: `已导入 ${imported} 条内容${skippedBeforeImport + failed ? `，跳过 ${skippedBeforeImport + failed} 条` : ''}`,
+        tone: 'success'
+      });
     } catch (error) {
-      alert(error instanceof Error ? `导入失败：${error.message}` : '导入失败');
+      void dialogs.alert({
+        message: error instanceof Error ? `导入失败：${error.message}` : '导入失败',
+        tone: 'danger'
+      });
     } finally {
       setImportingView(null);
     }
@@ -796,8 +1042,16 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   async function deleteSelected(view: AdminContentView) {
     const selected = selectedIds[view];
-    if (!selected.length) return alert('请先勾选需要删除的内容。');
-    if (!confirm(`确定删除已选中的 ${selected.length} 条内容吗？此操作不可恢复。`)) return;
+    if (!selected.length) {
+      void dialogs.alert({ message: '请先勾选需要删除的内容。', tone: 'warning' });
+      return;
+    }
+    if (!(await dialogs.confirm({
+      title: '批量删除内容',
+      message: `确定删除已选中的 ${selected.length} 条内容吗？此操作不可恢复。`,
+      confirmText: '删除',
+      tone: 'danger'
+    }))) return;
     const targets = getItems(view).filter((item) => selected.includes(Number(item.id)) && canManageItem(view, item));
     let deleted = 0;
     for (const item of targets) {
@@ -808,7 +1062,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
       if (view === 'messages' && await deleteMessage(item, false)) deleted += 1;
     }
     setSelectedIds((current) => ({ ...current, [view]: [] }));
-    alert(`已删除 ${deleted} 条内容`);
+    void dialogs.alert({ message: `已删除 ${deleted} 条内容`, tone: 'success' });
   }
 
   function toolbar(view: AdminContentView) {

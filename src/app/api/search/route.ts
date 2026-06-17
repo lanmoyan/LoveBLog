@@ -4,6 +4,7 @@ import { blogPostInclude, publicBlogWhere, serializeBlogPost } from '@/lib/blog'
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { formatDate, formatDateTime } from '@/lib/dates';
 import { prisma } from '@/lib/prisma';
+import { searchExcerpt } from '@/lib/text';
 import { publicUploadUrl } from '@/lib/uploads';
 import { canAdmin } from '@/lib/users';
 
@@ -11,7 +12,7 @@ export const runtime = 'nodejs';
 
 type SearchItem = {
   id: string;
-  type: 'essay' | 'story' | 'timeline' | 'album' | 'wishlist' | 'secret';
+  type: 'essay' | 'story' | 'timeline' | 'wishlist' | 'secret';
   label: string;
   title: string;
   excerpt: string;
@@ -26,10 +27,20 @@ type IndexedSearchItem = SearchItem & {
   tagsText: string;
 };
 
+type SearchUser = { id: number; roleKey?: string | null } | null;
+
+type SearchIndex = {
+  items: SearchItem[];
+  miniSearch: MiniSearch<IndexedSearchItem>;
+  expiresAt: number;
+};
+
 const SEARCH_SOURCE_LIMIT = 500;
 const SEARCH_RESULT_LIMIT = 18;
+const SEARCH_CACHE_TTL_MS = 30_000;
 const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const SEARCH_SEGMENT_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[\p{Letter}\p{Number}]+/gu;
+const searchIndexCache = new Map<string, SearchIndex>();
 
 const searchPostInclude = {
   author: {
@@ -49,14 +60,6 @@ const searchPostInclude = {
     select: { id: true, path: true }
   }
 };
-
-function compact(value: string) {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-function excerpt(value: string, fallback = '', limit = 120) {
-  return compact(value || fallback).slice(0, limit);
-}
 
 function uniqueTokens(tokens: string[]) {
   return Array.from(new Set(tokens.filter(Boolean)));
@@ -121,11 +124,8 @@ function toSearchItem(result: MiniSearchResult): SearchItem {
   };
 }
 
-function searchItems(items: SearchItem[], q: string) {
-  const queryTokens = tokenizeQueryText(q);
-  if (!queryTokens.length) return items;
-
-  const miniSearch = new MiniSearch<IndexedSearchItem>({
+function createMiniSearch() {
+  return new MiniSearch<IndexedSearchItem>({
     fields: ['label', 'title', 'excerpt', 'content', 'tagsText', 'date'],
     storeFields: ['type', 'label', 'title', 'excerpt', 'content', 'href', 'date', 'image', 'tags'],
     tokenize: tokenizeIndexText,
@@ -149,16 +149,40 @@ function searchItems(items: SearchItem[], q: string) {
       }
     }
   });
-
-  miniSearch.addAll(toIndexedItems(items));
-  return miniSearch.search(q, { tokenize: tokenizeQueryText }).map(toSearchItem);
 }
 
-export async function GET(request: Request) {
-  const user = await getAuthUserFromRequest(request);
-  const { searchParams } = new URL(request.url);
-  const q = (searchParams.get('q') || '').trim().slice(0, 80);
+function createSearchIndex(items: SearchItem[]): SearchIndex {
+  const miniSearch = createMiniSearch();
+  miniSearch.addAll(toIndexedItems(items));
+  return {
+    items,
+    miniSearch,
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS
+  };
+}
 
+function searchCacheKey(user: SearchUser) {
+  if (!user) return 'anonymous';
+  return canAdmin(user) ? 'admin' : `user:${user.id}`;
+}
+
+async function getSearchIndex(user: SearchUser) {
+  const key = searchCacheKey(user);
+  const cached = searchIndexCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+
+  const next = createSearchIndex(await loadSearchItems(user));
+  searchIndexCache.set(key, next);
+  return next;
+}
+
+function searchItems(index: SearchIndex, q: string) {
+  const queryTokens = tokenizeQueryText(q);
+  if (!queryTokens.length) return index.items;
+  return index.miniSearch.search(q, { tokenize: tokenizeQueryText }).map(toSearchItem);
+}
+
+async function loadSearchItems(user: SearchUser) {
   const [posts, stories, events, wishlist, messages] = await Promise.all([
     prisma.post.findMany({
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -195,26 +219,12 @@ export async function GET(request: Request) {
       type: 'essay',
       label: '说说',
       title: post.mood || post.author.displayName || '说说',
-      excerpt: excerpt(post.content, post.images.length ? `${post.images.length} 张图片` : '说说内容'),
+      excerpt: searchExcerpt(post.content, post.images.length ? `${post.images.length} 张图片` : '说说内容'),
       content: `${post.content} ${post.mood} ${post.author.displayName}`,
       href: `/essay/#post-${post.id}`,
       date: formatDateTime(post.createdAt),
       image: publicUploadUrl(post.images[0]?.path)
     };
-  });
-
-  const albumItems: SearchItem[] = posts.flatMap((post) => {
-    return post.images.map((image) => ({
-      id: `album-${image.id}`,
-      type: 'album' as const,
-      label: '相册',
-      title: post.mood || post.author.displayName || '相册图片',
-      excerpt: excerpt(post.content, `${post.author.displayName} 发布的相册图片`),
-      content: `${post.content} ${post.mood} ${post.author.displayName}`,
-      href: '/album/',
-      date: formatDateTime(post.createdAt),
-      image: publicUploadUrl(image.path)
-    }));
   });
 
   const storyItems: SearchItem[] = stories.map((story) => {
@@ -224,7 +234,7 @@ export async function GET(request: Request) {
       type: 'story',
       label: '故事',
       title: item.title,
-      excerpt: excerpt(item.excerpt || item.content, '', 82),
+      excerpt: searchExcerpt(item.excerpt || item.content),
       content: `${item.title} ${item.excerpt} ${item.content} ${item.tags.join(' ')} ${item.author.displayName}`,
       href: `/stories/${item.slug}/`,
       date: formatDateTime(item.publishedAt || item.createdAt),
@@ -238,7 +248,7 @@ export async function GET(request: Request) {
     type: 'timeline',
     label: '时光',
     title: event.title,
-    excerpt: excerpt(event.description, event.date),
+    excerpt: searchExcerpt(event.description, event.date),
     content: `${event.title} ${event.description} ${event.date}`,
     href: '/timeline/',
     date: formatDate(event.date),
@@ -261,14 +271,21 @@ export async function GET(request: Request) {
     type: 'secret',
     label: '悄悄话',
     title: message.user.displayName,
-    excerpt: excerpt(message.content),
+    excerpt: searchExcerpt(message.content),
     content: `${message.content} ${message.user.displayName}`,
     href: '/secret/',
     date: formatDateTime(message.createdAt)
   }));
 
-  const items = [...essayItems, ...storyItems, ...eventItems, ...albumItems, ...wishItems, ...secretItems];
-  const results = q ? searchItems(items, q) : items;
+  return [...essayItems, ...storyItems, ...eventItems, ...wishItems, ...secretItems];
+}
+
+export async function GET(request: Request) {
+  const user = await getAuthUserFromRequest(request);
+  const { searchParams } = new URL(request.url);
+  const q = (searchParams.get('q') || '').trim().slice(0, 80);
+  const index = await getSearchIndex(user);
+  const results = q ? searchItems(index, q) : index.items;
 
   return NextResponse.json({
     results: results.slice(0, SEARCH_RESULT_LIMIT),

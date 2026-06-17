@@ -72,6 +72,18 @@ export async function PUT(request: Request, context: Context) {
     const form = await request.formData();
     const parsed = parseStoryPayload(form);
     if (!parsed.success) return NextResponse.json({ error: '故事内容不完整' }, { status: 400 });
+    const duplicate = await prisma.blogPost.findFirst({
+      where: {
+        authorId: current.authorId,
+        title: parsed.data.title,
+        content: parsed.data.content,
+        id: { not: current.id }
+      },
+      select: { id: true }
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: '已存在相同故事，已取消保存' }, { status: 409 });
+    }
 
     let coverImage = current.coverImage;
     const file = form.get('cover');

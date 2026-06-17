@@ -19,7 +19,13 @@ export function SecretNotes() {
     load();
   }, [user?.id]);
 
-  if (!user) return <div className="empty-state"><Lock size={22} /> 登录后查看悄悄话。</div>;
+  if (!user) {
+    return (
+      <section className="secret-page">
+        <div className="empty-state"><Lock size={22} /> 登录后查看悄悄话。</div>
+      </section>
+    );
+  }
 
   return (
     <section className="secret-page">

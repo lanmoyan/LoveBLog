@@ -10,7 +10,6 @@ import {
   Command,
   Heart,
   Hourglass,
-  ImageIcon,
   LogIn,
   LogOut,
   MessageCircle,
@@ -22,13 +21,14 @@ import {
   UserRound,
   X
 } from 'lucide-react';
-import type { FocusEvent, UIEvent } from 'react';
+import type { FocusEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { brandIcon } from '@/lib/routes';
 import { GlobalSearch } from '@/components/global-search';
 import type { SiteSnapshot } from '@/lib/site';
 import { useSession } from '@/components/session-provider';
 import { VisitTracker } from '@/components/visit-tracker';
+import { truncateText } from '@/lib/text';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -45,10 +45,9 @@ const navGroups = [
   {
     key: 'memory',
     label: '回忆',
-    icon: ImageIcon,
+    icon: Hourglass,
     items: [
-      { href: '/timeline/', label: '时光', icon: Hourglass },
-      { href: '/album/', label: '相册', icon: ImageIcon }
+      { href: '/timeline/', label: '时光', icon: Hourglass }
     ]
   },
   {
@@ -79,8 +78,7 @@ function formatShortDate(value: Date | string | null | undefined) {
 }
 
 function clampText(value: string, fallback: string) {
-  const text = String(value || fallback).replace(/\s+/g, ' ').trim();
-  return text.length > 58 ? `${text.slice(0, 58)}...` : text;
+  return truncateText(value, 58, fallback);
 }
 
 function formatConsoleNumber(value: number) {
@@ -100,6 +98,7 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
   const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
   const [deviceDockVisible, setDeviceDockVisible] = useState(false);
   const deviceConsoleRef = useRef<HTMLDivElement | null>(null);
+  const deviceDockSentinelRef = useRef<HTMLDivElement | null>(null);
   const consoleData = snapshot.console;
 
   const totalStoryYears = useMemo(
@@ -152,6 +151,20 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
     });
   }, [consoleOpen]);
 
+  useEffect(() => {
+    if (!consoleOpen) return;
+    const root = deviceConsoleRef.current;
+    const sentinel = deviceDockSentinelRef.current;
+    if (!root || !sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setDeviceDockVisible(!entry.isIntersecting);
+    }, { root, threshold: 0.01 });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [consoleOpen]);
+
   function closeConsole() {
     setConsoleClosing(true);
     window.setTimeout(() => {
@@ -185,13 +198,6 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
     }
     const story = stories[Math.floor(Math.random() * stories.length)];
     router.push(story.href);
-  }
-
-  function updateDeviceDock(event: UIEvent<HTMLDivElement>) {
-    const target = event.currentTarget;
-    const hasScrolled = target.scrollTop > 72;
-    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 160;
-    setDeviceDockVisible(hasScrolled || nearBottom);
   }
 
   function activeGroup(items: readonly { href: string }[]) {
@@ -358,7 +364,8 @@ export function StoryRail({ snapshot }: { snapshot: SiteSnapshot }) {
           </footer>
         </div>
 
-        <div className="console-device-view" ref={deviceConsoleRef} onScroll={updateDeviceDock}>
+        <div className="console-device-view" ref={deviceConsoleRef}>
+          <div className="device-console-dock-sentinel" ref={deviceDockSentinelRef} aria-hidden="true" />
           <header className="device-console-head">
             <Link className="device-console-brand" href="/" title="返回首页" onClick={() => setConsoleOpen(false)}>
               <span><BrandIcon size={18} /></span>

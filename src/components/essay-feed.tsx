@@ -83,7 +83,7 @@ function MoodFoldStack({
     <div
       ref={stageRef}
       className="mood-stack-stage"
-      aria-label="折叠图片相册"
+      aria-label="折叠图片堆叠"
       tabIndex={0}
       onKeyDown={onStackKeyDown}
     >
@@ -108,7 +108,7 @@ export function EssayFeed({ initialPosts, initialNextCursor = null }: EssayFeedP
   const [nextCursor, setNextCursor] = useState<number | null>(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [preview, setPreview] = useState('');
-  const [expandedAlbums, setExpandedAlbums] = useState<Record<number, boolean>>({});
+  const [expandedImageGroups, setExpandedImageGroups] = useState<Record<number, boolean>>({});
   const [stackIndexes, setStackIndexes] = useState<Record<number, number>>({});
 
   async function loadPosts(cursor?: number | null) {
@@ -148,8 +148,8 @@ export function EssayFeed({ initialPosts, initialNextCursor = null }: EssayFeedP
     );
   }
 
-  function toggleAlbum(postId: number, expanded: boolean) {
-    setExpandedAlbums((current) => ({ ...current, [postId]: expanded }));
+  function toggleImageGroup(postId: number, expanded: boolean) {
+    setExpandedImageGroups((current) => ({ ...current, [postId]: expanded }));
   }
 
   const rotateStack = useCallback((postId: number, direction: number, imageCount: number) => {
@@ -166,7 +166,7 @@ export function EssayFeed({ initialPosts, initialNextCursor = null }: EssayFeedP
         <div className="notes-grid mood-card-grid">
           {posts.map((post) => {
           const images = post.images || [];
-          const albumExpanded = !!expandedAlbums[post.id];
+          const imageGroupExpanded = !!expandedImageGroups[post.id];
           const stackStart = images.length ? (stackIndexes[post.id] ?? 0) % images.length : 0;
           const expandedImages = images.slice(0, Math.min(images.length, 5));
           const extraImageCount = Math.max(images.length - 5, 0);
@@ -182,9 +182,9 @@ export function EssayFeed({ initialPosts, initialNextCursor = null }: EssayFeedP
                 </div>
                 {post.mood && <span className="mood-badge">{post.mood}</span>}
                 {images.length > 1 && (
-                  <button className="mood-album-toggle" type="button" onClick={() => toggleAlbum(post.id, !albumExpanded)}>
-                    {albumExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    {albumExpanded ? '收起图片' : '展开图片'}
+                  <button className="mood-image-toggle" type="button" onClick={() => toggleImageGroup(post.id, !imageGroupExpanded)}>
+                    {imageGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    {imageGroupExpanded ? '收起图片' : '展开图片'}
                   </button>
                 )}
               </header>
@@ -199,8 +199,8 @@ export function EssayFeed({ initialPosts, initialNextCursor = null }: EssayFeedP
                 </div>
               )}
               {images.length > 1 && (
-                <div className={albumExpanded ? 'mood-fold-gallery expanded' : 'mood-fold-gallery'}>
-                  {albumExpanded ? (
+                <div className={imageGroupExpanded ? 'mood-fold-gallery expanded' : 'mood-fold-gallery'}>
+                  {imageGroupExpanded ? (
                     <div className="moment-media mood-media mood-fold-grid mood-expanded-grid">
                       {expandedImages.map((image: any, index: number) => (
                         <button

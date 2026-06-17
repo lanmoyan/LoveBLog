@@ -19,7 +19,6 @@
 - `/essay/` 动态
 - `/stories/` 爱情博客
 - `/timeline/` 时光
-- `/album/` 相册
 - `/wishlist/` 心愿
 - `/secret/` 悄悄话
 - `/settings/` 设置
@@ -31,7 +30,6 @@
 - 爱情博客：长文故事、封面、标签、置顶、草稿、公开/私密可见性
 - 后台自定义表情包 JSON，支持外链图片表情
 - 时光碎片瀑布流、图片查看器、EXIF 自动识别与手动刷新
-- 首页相册轮播、拖拽上传、URL 图片和删除
 - 心愿便利贴、随机/自定义样式、日期时间标注
 - 悄悄话私密便签
 - 访问计数、站点标题、在一起日期等基础信息配置
@@ -97,10 +95,17 @@ npm run start
 ## Docker 运行
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 默认数据挂载：
 
 - `postgres-data` Docker volume 保存 PostgreSQL 数据
-- 上传文件默认进入 S3 / Cloudflare R2
+- `uploads-data` Docker volume 保存本地上传文件；也可以配置 S3 / Cloudflare R2
+
+推送到 `main` 后，GitHub Actions 会构建并发布镜像：
+
+```text
+ghcr.io/lanmoyan/loveblog:latest
+```

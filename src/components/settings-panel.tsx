@@ -7,7 +7,6 @@ import {
   Bell,
   BookOpen,
   Braces,
-  Camera,
   CalendarDays,
   ChevronDown,
   CreditCard,
@@ -114,7 +113,6 @@ type AuthIntegrationDraft = {
   oauthProviders: AuthProviderDraft[];
 };
 
-type AlbumImageDraft = SiteSnapshot['homeAlbumImages'][number];
 type EmojiPackDraft = SiteSnapshot['emojiPacks'][number];
 type EmojiItemDraft = EmojiPackDraft['items'][number];
 
@@ -263,15 +261,6 @@ function formatAdminDate(value: string | Date | null | undefined, fallback = '�
   });
 }
 
-function splitAlbumTags(value: string) {
-  return Array.from(new Set(
-    value
-      .split(/[\n,，、#]+/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-  )).slice(0, 8);
-}
-
 export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
   const { user, partner, partnerCandidates, refresh } = useSession();
   const router = useRouter();
@@ -300,10 +289,6 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
   const [emojiImport, setEmojiImport] = useState({ name: '', source: '' });
   const [emojiItemDrafts, setEmojiItemDrafts] = useState<Record<number, string>>({});
   const [emojiImportBusy, setEmojiImportBusy] = useState(false);
-  const [albumImages, setAlbumImages] = useState(snapshot.homeAlbumImages);
-  const [albumFiles, setAlbumFiles] = useState<File[]>([]);
-  const [albumUrls, setAlbumUrls] = useState('');
-  const [albumConfirmRemoveIndex, setAlbumConfirmRemoveIndex] = useState<number | null>(null);
   const [siteIconFiles, setSiteIconFiles] = useState<File[]>([]);
   const [siteIconPreviewMode, setSiteIconPreviewMode] = useState<'current' | 'default' | 'fallback'>('current');
   const [authIntegrations, setAuthIntegrations] = useState<AuthIntegrationDraft>(defaultAuthIntegrations);
@@ -455,7 +440,7 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
     Math.max(1, Math.round(numericStats.posts * .54)),
     numericStats.events + numericStats.stories,
     totalContent,
-    totalContent + albumImages.length,
+    totalContent + Math.max(1, Math.round(numericStats.likes * .3)),
     totalContent + numericStats.likes
   ];
   const maxTrend = Math.max(...trendValues, 1);
@@ -720,55 +705,6 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
 
   function emojiLabel(item: EmojiItemDraft) {
     return typeof item === 'string' ? item : item.label || item.text || '表情';
-  }
-
-  async function uploadAlbum() {
-    const form = new FormData();
-    albumFiles.forEach((file) => form.append('images', file));
-    form.set('imageUrls', albumUrls);
-    const res = await fetch('/api/meta/home-album/', { method: 'POST', body: form });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || '上传失败');
-    setAlbumImages(data.images);
-    setAlbumFiles([]);
-    setAlbumUrls('');
-    setAlbumConfirmRemoveIndex(null);
-    router.refresh();
-  }
-
-  async function removeAlbum(index: number) {
-    const res = await fetch(`/api/meta/home-album/${index}/`, { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || 'Delete failed');
-    setAlbumImages(data.images);
-    setAlbumConfirmRemoveIndex(null);
-    router.refresh();
-  }
-
-  function updateAlbumImage(index: number, patch: Partial<AlbumImageDraft>) {
-    setAlbumImages((current) => current.map((image, itemIndex) => (
-      itemIndex === index ? { ...image, ...patch } : image
-    )));
-  }
-
-  async function saveAlbumImage(index: number) {
-    const image = albumImages[index];
-    if (!image) return;
-    const res = await fetch(`/api/meta/home-album/${index}/`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: image.title || '',
-        description: image.description || '',
-        tags: image.tags || [],
-        mood: image.mood || ''
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || '保存失败');
-    setAlbumImages(data.images);
-    router.refresh();
-    alert('图片信息已保存');
   }
 
   async function saveProfile() {
@@ -1205,11 +1141,6 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
                   <strong>{numberText(totalContent)}</strong>
                   <small>{numberText(numericStats.posts)} 条说说</small>
                 </article>
-                <article className="admin-metric-card">
-                  <span><ImageIcon size={17} />相册资源</span>
-                  <strong>{numberText(albumImages.length)}</strong>
-                  <small>首页轮播图片</small>
-                </article>
                 <article className="admin-metric-card success">
                   <span><Shield size={17} />安全状态</span>
                   <strong>{stats.hasSecurityCode ? '已启用' : '待设置'}</strong>
@@ -1228,7 +1159,7 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
                   <strong>{numberText(snapshot.users.length)}</strong>
                 </article>
                 <article className="admin-metric-card compact">
-                  <span><Globe2 size={17} />图库模式</span>
+                  <span><Globe2 size={17} />EXIF 识别</span>
                   <strong>{info.imageMetaEnabled ? '开启' : '关闭'}</strong>
                 </article>
               </section>
@@ -1352,7 +1283,7 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
                   <section className="admin-settings-subpanel">
                     <div className="admin-section-title">
                       <h3>图片功能</h3>
-                      <p>控制相册和时光图片的参数识别开关。</p>
+                      <p>控制说说和时光图片的参数识别开关。</p>
                     </div>
                     <div className="admin-switch-row inline">
                       <label><input type="checkbox" checked={info.imageMetaEnabled} onChange={(event) => setInfo({ ...info, imageMetaEnabled: event.target.checked })} />自动识别 EXIF</label>

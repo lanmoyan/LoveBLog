@@ -35,7 +35,6 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.57.0",
     "sharp": "^0.35.1",
-    "yet-another-react-lightbox": "^3.32.0",
     "zod": "^3.25.42"
   },
   "devDependencies": {

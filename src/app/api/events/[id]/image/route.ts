@@ -1,26 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAdminUser } from '@/lib/auth';
+import { publicEvent } from '@/lib/events';
 import { prisma } from '@/lib/prisma';
 import { jsonError } from '@/lib/responses';
 import { removeUpload } from '@/lib/upload-storage';
-import { publicUploadUrl } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
 type Context = { params: Promise<{ id: string }> };
-
-function parseMeta(value: string) {
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function publicEvent<T extends { image: string; imageMeta: string }>(event: T) {
-  return { ...event, image: publicUploadUrl(event.image), imageMeta: parseMeta(event.imageMeta) };
-}
 
 export async function DELETE(request: Request, context: Context) {
   try {

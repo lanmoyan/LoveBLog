@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ArrowRight, ImageIcon, Loader2, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { imageVariantUrl } from '@/lib/image-variants';
+import { SEARCH_EXCERPT_LIMIT, truncateText } from '@/lib/text';
 
 type SearchResult = {
   id: string;
@@ -23,9 +24,11 @@ type SearchResponse = {
   engine?: string;
 };
 
-const quickWords = ['说说', '故事', '时光', '相册', '心愿'];
+const quickWords = ['说说', '故事', '时光', '心愿'];
 
 function SearchResultCard({ item, onOpen }: { item: SearchResult; onOpen: () => void }) {
+  const excerpt = truncateText(item.excerpt, SEARCH_EXCERPT_LIMIT);
+
   return (
     <Link className="search-result-card global-search-card" href={item.href} onClick={onOpen}>
       {item.image ? (
@@ -38,7 +41,7 @@ function SearchResultCard({ item, onOpen }: { item: SearchResult; onOpen: () => 
       <span className="global-search-copy">
         <span className="global-search-meta">{item.label} · {item.date}</span>
         <strong className="global-search-title" title={item.title}>{item.title}</strong>
-        <small className="global-search-excerpt" title={item.excerpt}>{item.excerpt}</small>
+        <small className="global-search-excerpt" title={item.excerpt}>{excerpt}</small>
       </span>
       <ArrowRight className="global-search-arrow" size={18} />
     </Link>
@@ -124,7 +127,7 @@ export function GlobalSearch() {
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索说说、故事、时光、相册、心愿"
+            placeholder="搜索说说、故事、时光、心愿"
           />
           <span className="search-loading">{loading ? <Loader2 size={17} /> : null}</span>
         </form>

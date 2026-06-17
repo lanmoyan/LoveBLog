@@ -30,6 +30,13 @@ export async function POST(request: Request) {
     const user = await requireAuthUser(request);
     const parsed = MessageSchema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return NextResponse.json({ error: '悄悄话内容不正确' }, { status: 400 });
+    const duplicate = await prisma.message.findFirst({
+      where: { userId: user.id, content: parsed.data.content },
+      select: { id: true }
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: '已存在相同悄悄话，已跳过重复内容' }, { status: 409 });
+    }
     const message = await prisma.message.create({
       data: { userId: user.id, ...parsed.data },
       include: { user: { select: publicUserSelect } }

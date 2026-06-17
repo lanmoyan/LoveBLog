@@ -27,7 +27,6 @@ async function main() {
     { key: 'site_title', value: process.env.APP_NAME || '我们的小星球' },
     { key: 'site_icon', value: '/site-icon.svg' },
     { key: 'together_since', value: new Date().toISOString().slice(0, 10) },
-    { key: 'home_album_images', value: '[]' },
     { key: 'special_dates', value: '[]' },
     { key: 'emoji_packs_json', value: JSON.stringify(DEFAULT_EMOJI_PACKS) },
     { key: 'image_meta_enabled', value: '1' },

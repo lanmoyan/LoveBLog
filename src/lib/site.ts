@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { parseTags } from '@/lib/blog';
 import { postInclude, serializePost } from '@/lib/posts';
-import { getSettingMap, normalizeHomeAlbumImages, readEmojiPacksFromMap, readUserRolesFromMap, safeJson, type HomeAlbumImage } from '@/lib/settings';
+import { getSettingMap, readEmojiPacksFromMap, readUserRolesFromMap, safeJson } from '@/lib/settings';
 import { publicUploadUrl } from '@/lib/uploads';
 import { publicUserProfile, publicUserSelect } from '@/lib/users';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -114,10 +114,6 @@ async function loadSiteSnapshot() {
       title: settings.get('site_title') || process.env.APP_NAME || '我们的小星球',
       siteIcon,
       togetherSince: settings.get('together_since') || '',
-      homeAlbumImages: normalizeHomeAlbumImages(safeJson(settings.get('home_album_images'), [])).map((image) => ({
-        ...image,
-        path: publicUploadUrl(image.path)
-      })),
       specialDates: safeJson<Array<{ name: string; date: string; recurring?: boolean }>>(settings.get('special_dates'), []),
       imageMetaEnabled: settings.get('image_meta_enabled') !== '0',
       twikooEnvId: settings.get('twikoo_env_id') || process.env.NEXT_PUBLIC_TWIKOO_ENV_ID || '',
@@ -170,7 +166,6 @@ async function loadSiteSnapshot() {
       title: settings.get('site_title') || process.env.APP_NAME || '我们的小星球',
       siteIcon: publicUploadUrl(settings.get('site_icon') || '/site-icon.svg'),
       togetherSince: settings.get('together_since') || '',
-      homeAlbumImages: [] as HomeAlbumImage[],
       specialDates: [] as Array<{ name: string; date: string; recurring?: boolean }>,
       imageMetaEnabled: true,
       twikooEnvId: settings.get('twikoo_env_id') || process.env.NEXT_PUBLIC_TWIKOO_ENV_ID || '',

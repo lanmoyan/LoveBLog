@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { canManagePost, postInclude, serializePost } from '@/lib/posts';
+import { canManagePost, hasDuplicatePostContent, postInclude, serializePost } from '@/lib/posts';
 import { jsonError } from '@/lib/responses';
 import { parseImageUrls } from '@/lib/settings';
 import { removeUpload, saveUploadedFile } from '@/lib/upload-storage';
@@ -45,6 +45,16 @@ export async function PUT(request: Request, context: Context) {
       if (!content && current.images.length === 0 && !current.video) {
         return NextResponse.json({ error: '动态不能为空' }, { status: 400 });
       }
+      if (await hasDuplicatePostContent({
+        authorId: current.authorId,
+        content,
+        mood,
+        video: current.video,
+        imagePaths: current.images.map((image) => image.path),
+        excludeId: current.id
+      })) {
+        return NextResponse.json({ error: '已存在相同说说，已取消保存' }, { status: 409 });
+      }
       const post = await prisma.post.update({ where: { id: current.id }, data: { content, mood }, include: postInclude });
       return NextResponse.json({ post: serializePost(post, user.id) });
     }
@@ -78,6 +88,16 @@ export async function PUT(request: Request, context: Context) {
     if (!content && keptImages.length === 0 && imageFiles.length === 0 && imageUrls.length === 0 && !nextVideo) {
       if (hasNewVideo) await removeUpload(nextVideo);
       return NextResponse.json({ error: '动态不能为空' }, { status: 400 });
+    }
+    if (!imageFiles.length && !hasNewVideo && await hasDuplicatePostContent({
+      authorId: current.authorId,
+      content,
+      mood,
+      video: nextVideo,
+      imagePaths: keptImages.map((image) => image.path).concat(imageUrls),
+      excludeId: current.id
+    })) {
+      return NextResponse.json({ error: '已存在相同说说，已取消保存' }, { status: 409 });
     }
 
     const uploadedImages = [];

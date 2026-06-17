@@ -19,8 +19,7 @@ const footerColumns = [
     links: [
       { href: '/essay/', label: '说说' },
       { href: '/stories/', label: '爱情博客' },
-      { href: '/timeline/', label: '时光碎片' },
-      { href: '/album/', label: '相册图库' }
+      { href: '/timeline/', label: '时光碎片' }
     ]
   },
   {
@@ -173,7 +172,7 @@ function SiteFooter({ snapshot }: { snapshot: SiteSnapshot }) {
           </span>
           <div>
             <h2>{snapshot.title}</h2>
-            <p>把说说、照片、故事、心愿和留言都放在同一颗小星球里。</p>
+            <p>把说说、故事、心愿和留言都放在同一颗小星球里。</p>
             {recordLinks.length ? (
               <div className="footer-record-links footer-brand-records">
                 {recordLinks.map((item) => (
@@ -217,7 +216,6 @@ export function ShellFrame({ children, snapshot }: { children: ReactNode; snapsh
   const isAdmin = pathname.startsWith('/settings');
   const isLogin = pathname.startsWith('/login');
   const isHome = pathname === '/';
-  const isAlbum = pathname.startsWith('/album');
 
   if (isAdmin) {
     return (
@@ -248,14 +246,6 @@ export function ShellFrame({ children, snapshot }: { children: ReactNode; snapsh
         </header>
         <main className="login-shell-main">{children}</main>
         <footer className="login-shell-footer">© {year} {snapshot.title}. All rights reserved.</footer>
-      </div>
-    );
-  }
-
-  if (isAlbum) {
-    return (
-      <div className="app-shell album-shell album-shell-standalone">
-        <main className="workspace album-workspace">{children}</main>
       </div>
     );
   }

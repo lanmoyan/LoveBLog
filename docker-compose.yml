@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
 
   love-next:
+    image: ghcr.io/lanmoyan/loveblog:latest
     build: .
     ports:
       - "3000:3000"

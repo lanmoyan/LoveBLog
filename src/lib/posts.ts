@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { publicUploadUrl } from '@/lib/uploads';
 import { canAdmin, publicUserProfile, publicUserSelect } from '@/lib/users';
 
@@ -24,4 +25,37 @@ export function serializePost(post: HydratedPost, currentUserId?: number | null)
 
 export function canManagePost(post: { authorId: number }, user?: { id: number; roleKey?: string | null } | null) {
   return canAdmin(user) || (!!user && post.authorId === user.id);
+}
+
+function postMediaKey(paths: string[]) {
+  return paths.map((path) => String(path || '').trim()).filter(Boolean).sort().join('\n');
+}
+
+export async function hasDuplicatePostContent({
+  authorId,
+  content,
+  mood,
+  video,
+  imagePaths,
+  excludeId
+}: {
+  authorId: number;
+  content: string;
+  mood: string;
+  video: string;
+  imagePaths: string[];
+  excludeId?: number;
+}) {
+  const candidates = await prisma.post.findMany({
+    where: {
+      authorId,
+      content,
+      mood,
+      video,
+      ...(excludeId ? { id: { not: excludeId } } : {})
+    },
+    include: { images: { select: { path: true } } }
+  });
+  const nextKey = postMediaKey(imagePaths);
+  return candidates.some((post) => postMediaKey(post.images.map((image) => image.path)) === nextKey);
 }

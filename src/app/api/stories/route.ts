@@ -82,6 +82,13 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const parsed = parseStoryPayload(form);
     if (!parsed.success) return NextResponse.json({ error: '故事内容不完整' }, { status: 400 });
+    const duplicate = await prisma.blogPost.findFirst({
+      where: { authorId: user.id, title: parsed.data.title, content: parsed.data.content },
+      select: { id: true }
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: '已存在相同故事，已跳过重复内容' }, { status: 409 });
+    }
     const file = form.get('cover');
     const uploadedCover = file instanceof File && file.size > 0 ? await saveUploadedFile(file, 'story-cover', { maxBytes: 8 * 1024 * 1024 }) : '';
     const coverImage = uploadedCover || parsed.data.coverImage || '';

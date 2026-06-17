@@ -1,32 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAuthUserFromRequest, requireAdminUser } from '@/lib/auth';
-import { readCachedImageMeta } from '@/lib/image-meta-cache';
+import { autoEventImageMeta, publicEvent } from '@/lib/events';
 import { prisma } from '@/lib/prisma';
 import { jsonError } from '@/lib/responses';
-import { getSetting } from '@/lib/settings';
 import { saveUploadedFile } from '@/lib/upload-storage';
-import { cleanRemoteImageUrl, publicUploadUrl } from '@/lib/uploads';
+import { cleanRemoteImageUrl } from '@/lib/uploads';
 import { canAdmin } from '@/lib/users';
 
 export const runtime = 'nodejs';
-
-function parseMeta(value: string) {
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function publicEvent<T extends { image: string; imageMeta: string }>(event: T) {
-  return { ...event, image: publicUploadUrl(event.image), imageMeta: parseMeta(event.imageMeta) };
-}
-
-async function autoMeta(image: string) {
-  if ((await getSetting('image_meta_enabled', '1')) === '0') return {};
-  return readCachedImageMeta(image);
-}
 
 export async function GET(request: Request) {
   const user = await getAuthUserFromRequest(request);
@@ -51,6 +32,13 @@ export async function POST(request: Request) {
     const description = String(form.get('description') || '').trim().slice(0, 500);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: '请选择正确的日期' }, { status: 400 });
     if (!title) return NextResponse.json({ error: '事件标题不能为空' }, { status: 400 });
+    const duplicate = await prisma.event.findFirst({
+      where: { date, title, description },
+      select: { id: true }
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: '已存在相同时光碎片，已跳过重复内容' }, { status: 409 });
+    }
     const file = form.get('image');
     const imageUrl = cleanRemoteImageUrl(form.get('imageUrl') || form.get('image_url'));
     const image = file instanceof File && file.size > 0 ? await saveUploadedFile(file, 'event') : imageUrl;
@@ -60,7 +48,7 @@ export async function POST(request: Request) {
         title,
         description,
         image,
-        imageMeta: JSON.stringify(await autoMeta(image))
+        imageMeta: JSON.stringify(await autoEventImageMeta(image))
       }
     });
     return NextResponse.json({ event: publicEvent(event) }, { status: 201 });

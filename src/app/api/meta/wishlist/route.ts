@@ -46,6 +46,13 @@ export async function POST(request: Request) {
     await requireAdminUser(request);
     const parsed = WishSchema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return NextResponse.json({ error: '心愿内容不正确' }, { status: 400 });
+    const duplicate = await prisma.wishlistItem.findFirst({
+      where: { content: parsed.data.content },
+      select: { id: true }
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: '已存在相同心愿，已跳过重复内容' }, { status: 409 });
+    }
     const item = await prisma.wishlistItem.create({ data: cleanWish(parsed.data) });
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {

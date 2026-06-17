@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getAuthUserFromRequest, requireAuthUser } from '@/lib/auth';
 import { lookupRegion, encryptIp, normalizeIp } from '@/lib/ip';
-import { canManagePost, postInclude, serializePost } from '@/lib/posts';
+import { canManagePost, hasDuplicatePostContent, postInclude, serializePost } from '@/lib/posts';
 import { jsonError } from '@/lib/responses';
 import { parseImageUrls } from '@/lib/settings';
 import { removeUpload, saveUploadedFile } from '@/lib/upload-storage';
@@ -87,6 +87,9 @@ export async function POST(request: Request) {
 
     if (!content && !imageFiles.length && !imageUrls.length && !video) {
       return NextResponse.json({ error: '写点什么、选张照片或视频吧' }, { status: 400 });
+    }
+    if (!imageFiles.length && await hasDuplicatePostContent({ authorId: user.id, content, mood, video, imagePaths: imageUrls })) {
+      return NextResponse.json({ error: '已存在相同说说，已跳过重复内容' }, { status: 409 });
     }
 
     const uploadedImages = [];
