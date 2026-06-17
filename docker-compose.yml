@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   love-next:
-    image: ghcr.io/lanmoyan/loveblog:latest
+    image: "${APP_IMAGE:-ghcr.io/lanmoyan/loveblog:latest}"
     pull_policy: always
     ports:
       - "3000:3000"

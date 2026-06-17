@@ -5,14 +5,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_BUILD_CPUS=1
 ENV SKIP_BUILD_TYPECHECK=1
 ENV NODE_OPTIONS=--max-old-space-size=384
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ARG RUN_TYPECHECK=1
 RUN apk add --no-cache ca-certificates openssl
 
 COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --registry="$NPM_REGISTRY" --no-audit --no-fund
 
 COPY . .
 RUN npx prisma generate
-RUN npm run typecheck
+RUN if [ "$RUN_TYPECHECK" = "1" ]; then npm run typecheck; fi
 RUN npm run build:next
 RUN npm run clean:generated
 

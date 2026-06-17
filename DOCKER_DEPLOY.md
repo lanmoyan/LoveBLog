@@ -6,7 +6,7 @@ This project publishes a production image to GitHub Container Registry:
 ghcr.io/lanmoyan/loveblog:latest
 ```
 
-The default `docker-compose.yml` runs from that image. Local builds use `docker-compose.build.yml` as an override.
+The default `docker-compose.yml` runs from that image. Set `APP_IMAGE` to use a faster mirror registry. Local builds use `docker-compose.build.yml` as an override.
 
 ## 1. Quick start
 
@@ -28,6 +28,54 @@ bash deploy.sh
 
 It shows a 0-100 deployment progress bar and asks Docker Compose to print plain pull progress for each image layer. Docker does not expose one perfectly accurate global download percentage, so the long `Pulling images` step may still depend on your server network speed.
 The published app image uses a smaller Alpine-based runtime image to reduce first-pull bytes. For upgrades, prefer `bash deploy.sh` or `docker compose pull && docker compose up -d` so existing layers are reused.
+
+## China server fast path
+
+If your server is in mainland China, pulling directly from GHCR can still be slow even with a small image. Use one of these two faster paths.
+
+### Option A: Push the image to a domestic registry
+
+Create an image repository in Aliyun Container Registry, then add these GitHub repository variables:
+
+- `ALIYUN_REGISTRY`: for example `registry.cn-hangzhou.aliyuncs.com`
+- `ALIYUN_IMAGE`: for example `registry.cn-hangzhou.aliyuncs.com/your-namespace/loveblog`
+
+Add these GitHub repository secrets:
+
+- `ALIYUN_REGISTRY_USERNAME`
+- `ALIYUN_REGISTRY_PASSWORD`
+
+After the next push to `main`, GitHub Actions will publish both:
+
+```text
+ghcr.io/lanmoyan/loveblog:latest
+registry.cn-hangzhou.aliyuncs.com/your-namespace/loveblog:latest
+```
+
+Then deploy with the domestic image:
+
+```bash
+cd /www/wwwroot/love.imoyan.top
+APP_IMAGE=registry.cn-hangzhou.aliyuncs.com/your-namespace/loveblog:latest bash deploy.sh
+```
+
+You can also put this in `.env`:
+
+```bash
+APP_IMAGE=registry.cn-hangzhou.aliyuncs.com/your-namespace/loveblog:latest
+```
+
+### Option B: Build on the server instead of pulling GHCR
+
+This avoids pulling the app image from GHCR. It requires the full source repository on the server:
+
+```bash
+cd /www/wwwroot/love.imoyan.top
+git pull origin main
+NPM_REGISTRY=https://registry.npmmirror.com DEPLOY_MODE=build bash deploy.sh
+```
+
+Use this when GHCR is slow and you have not configured a domestic image registry yet. The first local build still needs Docker base images and npm packages, but repeated builds can reuse Docker cache.
 
 For public production, you should still set your real domain and stronger passwords. You can either edit `docker-compose.yml` directly or create an optional `.env` file:
 

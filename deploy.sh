@@ -2,8 +2,14 @@
 set -Eeuo pipefail
 
 PROGRESS_WIDTH="${PROGRESS_WIDTH:-30}"
+DEPLOY_MODE="${DEPLOY_MODE:-pull}"
 
 compose_cmd=()
+compose_files=(-f docker-compose.yml)
+
+compose() {
+  "${compose_cmd[@]}" "${compose_files[@]}" "$@"
+}
 
 render_progress() {
   local percent="$1"
@@ -24,7 +30,7 @@ render_progress() {
 fail() {
   echo
   echo "Deploy failed. Show recent logs with:"
-  echo "  ${compose_cmd[*]} logs --tail=120"
+  echo "  ${compose_cmd[*]} ${compose_files[*]} logs --tail=120"
 }
 
 trap fail ERR
@@ -32,6 +38,11 @@ trap fail ERR
 cd "$(dirname "$0")"
 
 render_progress 0 "Starting LoveBLog deployment"
+
+if [[ "$DEPLOY_MODE" != "pull" && "$DEPLOY_MODE" != "build" ]]; then
+  echo "Unsupported DEPLOY_MODE: $DEPLOY_MODE. Use pull or build."
+  exit 1
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is not installed or not in PATH."
@@ -53,23 +64,41 @@ docker version >/dev/null
 render_progress 15 "Docker Compose is ready"
 "${compose_cmd[@]}" version
 
-render_progress 25 "Validating docker-compose.yml"
-"${compose_cmd[@]}" config >/dev/null
+if [[ "$DEPLOY_MODE" == "build" ]]; then
+  if [[ ! -f Dockerfile || ! -f package.json || ! -f docker-compose.build.yml ]]; then
+    echo "DEPLOY_MODE=build requires the full source repository, including Dockerfile, package.json, and docker-compose.build.yml."
+    exit 1
+  fi
+  compose_files=(-f docker-compose.yml -f docker-compose.build.yml)
+fi
 
-render_progress 35 "Pulling images. Large layers may stay here for a while"
-if ! "${compose_cmd[@]}" --progress=plain pull; then
-  "${compose_cmd[@]}" pull
+render_progress 25 "Validating docker-compose.yml"
+compose config >/dev/null
+
+if [[ "$DEPLOY_MODE" == "build" ]]; then
+  render_progress 35 "Pulling database image"
+  compose pull postgres || true
+
+  render_progress 50 "Building app image locally"
+  compose build love-next
+else
+  render_progress 35 "Pulling images. Large layers may stay here for a while"
+  if ! "${compose_cmd[@]}" "${compose_files[@]}" --progress=plain pull; then
+    compose pull
+  fi
 fi
 
 render_progress 75 "Starting containers"
-if [[ "${compose_cmd[0]}" == "docker" && "${compose_cmd[1]:-}" == "compose" ]]; then
-  "${compose_cmd[@]}" up -d --pull never
+if [[ "$DEPLOY_MODE" == "build" ]]; then
+  compose up -d --no-build
+elif compose up -d --pull never; then
+  :
 else
-  "${compose_cmd[@]}" up -d
+  compose up -d
 fi
 
 render_progress 90 "Checking container status"
-"${compose_cmd[@]}" ps
+compose ps
 
 render_progress 100 "Deployment complete"
 echo
@@ -77,5 +106,5 @@ echo "Open your site at:"
 echo "  http://SERVER_IP:3000"
 echo
 echo "Useful commands:"
-echo "  ${compose_cmd[*]} logs -f love-next"
-echo "  ${compose_cmd[*]} ps"
+echo "  ${compose_cmd[*]} ${compose_files[*]} logs -f love-next"
+echo "  ${compose_cmd[*]} ${compose_files[*]} ps"

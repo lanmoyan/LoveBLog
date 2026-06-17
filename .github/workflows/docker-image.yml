@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/lanmoyan/loveblog
+  GHCR_IMAGE: ghcr.io/lanmoyan/loveblog
 
 jobs:
   build-and-push:
@@ -32,15 +32,56 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Login to optional Aliyun registry
+        if: ${{ vars.ALIYUN_REGISTRY != '' && vars.ALIYUN_IMAGE != '' }}
+        uses: docker/login-action@v3
         with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-
-            type=ref,event=tag
+          registry: ${{ vars.ALIYUN_REGISTRY }}
+          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      - name: Login to optional Docker Hub registry
+        if: ${{ vars.DOCKERHUB_IMAGE != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare image tags
+        id: tags
+        shell: bash
+        env:
+          ALIYUN_IMAGE: ${{ vars.ALIYUN_IMAGE }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+        run: |
+          set -euo pipefail
+
+          images=("${GHCR_IMAGE}")
+          if [[ -n "${ALIYUN_IMAGE:-}" ]]; then
+            images+=("${ALIYUN_IMAGE}")
+          fi
+          if [[ -n "${DOCKERHUB_IMAGE:-}" ]]; then
+            images+=("${DOCKERHUB_IMAGE}")
+          fi
+
+          short_sha="${GITHUB_SHA::7}"
+          tags=()
+          for image in "${images[@]}"; do
+            tags+=("${image}:sha-${short_sha}")
+            if [[ "${GITHUB_REF_TYPE}" == "branch" && "${GITHUB_REF_NAME}" == "main" ]]; then
+              tags+=("${image}:latest")
+            fi
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              tags+=("${image}:${GITHUB_REF_NAME}")
+            fi
+          done
+
+          {
+            echo "tags<<EOF"
+            printf '%s\n' "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -48,7 +89,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

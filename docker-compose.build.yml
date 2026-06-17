@@ -1,4 +1,9 @@
 services:
   love-next:
-    build: .
+    image: "${LOCAL_APP_IMAGE:-loveblog-local:latest}"
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: "${NPM_REGISTRY:-https://registry.npmjs.org/}"
+        RUN_TYPECHECK: "${RUN_TYPECHECK:-0}"
     pull_policy: never
