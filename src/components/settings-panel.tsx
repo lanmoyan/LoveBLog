@@ -42,248 +42,45 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { AdminContentManager, type AdminContentView } from '@/components/admin-content-manager';
+import { AdminContentManager } from '@/components/admin-content-manager';
 import { MediaDropzone } from '@/components/media-dropzone';
 import { useSession } from '@/components/session-provider';
+import {
+  adminCopy,
+  adminLanguages,
+  adminOnlyViews,
+  adminViewHashes,
+  authIntegrationsFromResponse,
+  cleanRoleKey,
+  contentViews,
+  defaultAuthIntegrations,
+  durationText,
+  emojiLabel,
+  formatAdminDate,
+  makeEmojiItem,
+  numberText,
+  roleLabel,
+  siteInfoFromResponse,
+  siteInfoFromSnapshot,
+  userContentViews,
+  userStatusLabel,
+  type AdminContentView,
+  type AdminLanguage,
+  type AdminView,
+  type AuthIntegrationDraft,
+  type AuthProviderDraft,
+  type EmojiItemDraft,
+  type EmojiPackDraft,
+  type ManagedUser,
+  type Stats,
+  type UserRole
+} from '@/lib/admin-settings';
 import type { SiteSnapshot } from '@/lib/site';
-
-type Stats = {
-  posts?: number;
-  likes?: number;
-  messages?: number;
-  events?: number;
-  wishlist?: number;
-  stories?: number;
-  visits?: number;
-  hasSecurityCode?: boolean;
-  visitSummary?: {
-    today: number;
-    week: number;
-    month: number;
-    year: number;
-    total: number;
-    avgDuration: number;
-  };
-  visitSeries?: Array<{ label: string; visits: number }>;
-  topPages?: Array<{ path: string; views: number; avgDuration: number }>;
-  regions?: Array<{ region: string; visits: number }>;
-  devices?: Array<{ type: string; visits: number; detail?: string }>;
-  recentVisits?: Array<{ path: string; region: string; device: string; duration: number; createdAt: string }>;
-};
-
-type UserRole = {
-  key: string;
-  name: string;
-  canAdmin: boolean;
-};
-
-type ManagedUser = {
-  id: number;
-  username: string;
-  displayName: string;
-  avatar: string;
-  avatarImage: string;
-  partnerId?: number | null;
-  roleKey: string;
-  roleName?: string;
-  status?: string;
-  statusLabel?: string;
-  lastLoginAt?: string | Date | null;
-  createdAt?: string | Date;
-};
-
-type AuthProviderDraft = {
-  key: string;
-  name: string;
-  enabled: boolean;
-  clientId: string;
-  clientSecret?: string;
-  hasSecret?: boolean;
-};
-
-type AuthIntegrationDraft = {
-  registrationEmailEnabled: boolean;
-  smtpHost: string;
-  smtpPort: string;
-  smtpSecure: boolean;
-  smtpUser: string;
-  smtpFrom: string;
-  smtpPass: string;
-  smtpPassConfigured: boolean;
-  oauthProviders: AuthProviderDraft[];
-};
-
-type EmojiPackDraft = SiteSnapshot['emojiPacks'][number];
-type EmojiItemDraft = EmojiPackDraft['items'][number];
-
-type AdminView = 'overview' | AdminContentView | 'site' | 'emoji' | 'profile' | 'stats' | 'users';
-
-const contentViews: AdminContentView[] = ['posts', 'stories', 'events', 'wishlist', 'messages'];
-
-const adminViewHashes: Record<AdminView, string> = {
-  overview: 'overview',
-  posts: 'content-posts',
-  stories: 'content-stories',
-  events: 'content-events',
-  wishlist: 'content-wishlist',
-  messages: 'content-messages',
-  site: 'site',
-  emoji: 'emoji',
-  profile: 'profile',
-  stats: 'stats',
-  users: 'users'
-};
-
-const userContentViews: AdminContentView[] = ['posts', 'stories', 'messages'];
-const adminOnlyViews: AdminView[] = ['site', 'emoji', 'stats', 'users', 'events', 'wishlist'];
-type AdminLanguage = 'zh-CN' | 'en-US';
-
-const adminLanguages: Record<AdminLanguage, { label: string; description: string }> = {
-  'zh-CN': { label: '中文', description: '后台按钮和设置保持中文偏好' },
-  'en-US': { label: 'English', description: 'Remember English as the admin language preference' }
-};
-
-const adminCopy = {
-  'zh-CN': {
-    nav: {
-      overview: '仪表盘',
-      data: '全站数据',
-      mine: '我的内容',
-      posts: '说说管理',
-      stories: '故事管理',
-      events: '时光管理',
-      wishlist: '心愿管理',
-      messages: '悄悄话',
-      site: '基础信息',
-      emoji: '表情商店',
-      profile: '账号与安全',
-      stats: '访问统计',
-      users: '用户管理',
-      home: '返回前台'
-    },
-    top: {
-      guide: '教程',
-      dark: '暗色',
-      notice: '公告',
-      visits: '访问',
-      profile: '账号资料',
-      home: '返回前台',
-      logout: '退出登录'
-    }
-  },
-  'en-US': {
-    nav: {
-      overview: 'Dashboard',
-      data: 'Site Data',
-      mine: 'My Content',
-      posts: 'Posts',
-      stories: 'Stories',
-      events: 'Timeline',
-      wishlist: 'Wishlist',
-      messages: 'Private Notes',
-      site: 'Site Basics',
-      emoji: 'Emoji Store',
-      profile: 'Account & Security',
-      stats: 'Visit Stats',
-      users: 'Users',
-      home: 'Back Home'
-    },
-    top: {
-      guide: 'Guide',
-      dark: 'Dark',
-      notice: 'Notice',
-      visits: 'Visits',
-      profile: 'Account',
-      home: 'Back Home',
-      logout: 'Sign Out'
-    }
-  }
-} as const satisfies Record<AdminLanguage, {
-  nav: Record<string, string>;
-  top: Record<string, string>;
-}>;
-
-const defaultOAuthProviders: AuthProviderDraft[] = [
-  { key: 'github', name: 'GitHub', enabled: false, clientId: '', clientSecret: '', hasSecret: false },
-  { key: 'google', name: 'Google', enabled: false, clientId: '', clientSecret: '', hasSecret: false },
-  { key: 'discord', name: 'Discord', enabled: false, clientId: '', clientSecret: '', hasSecret: false },
-  { key: 'qq', name: 'QQ', enabled: false, clientId: '', clientSecret: '', hasSecret: false },
-  { key: 'wechat', name: 'WeChat', enabled: false, clientId: '', clientSecret: '', hasSecret: false }
-];
-
-const defaultAuthIntegrations: AuthIntegrationDraft = {
-  registrationEmailEnabled: false,
-  smtpHost: '',
-  smtpPort: '465',
-  smtpSecure: true,
-  smtpUser: '',
-  smtpFrom: '',
-  smtpPass: '',
-  smtpPassConfigured: false,
-  oauthProviders: defaultOAuthProviders
-};
-
-function numberText(value: number | undefined) {
-  return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
-}
-
-function durationText(value: number | undefined) {
-  const seconds = Math.max(0, Math.round(Number(value || 0) / 1000));
-  if (seconds < 60) return `${seconds} 秒`;
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`;
-}
-
-function cleanRoleKey(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32);
-}
-
-function roleLabel(roles: UserRole[], key: string) {
-  return roles.find((role) => role.key === key)?.name || key || '普通用户';
-}
-
-function userStatusLabel(value: string | undefined) {
-  return value === 'banned' ? '已封禁' : '正常';
-}
-
-function formatAdminDate(value: string | Date | null | undefined, fallback = '未记录') {
-  if (!value) return fallback;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return fallback;
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-}
 
 export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
   const { user, partner, partnerCandidates, refresh } = useSession();
   const router = useRouter();
-  const [info, setInfo] = useState({
-    siteTitle: snapshot.title,
-    siteIcon: snapshot.siteIcon,
-    togetherSince: snapshot.togetherSince,
-    imageMetaEnabled: snapshot.imageMetaEnabled,
-    twikooEnvId: snapshot.twikooEnvId,
-    twikooRegion: snapshot.twikooRegion,
-    announcementEnabled: snapshot.announcementEnabled,
-    announcementTitle: snapshot.announcementTitle,
-    announcementContent: snapshot.announcementContent,
-    footerMessageUrl: snapshot.footer.messageUrl,
-    footerRssUrl: snapshot.footer.rssUrl,
-    footerRewardUrl: snapshot.footer.rewardUrl,
-    footerIcpNumber: snapshot.footer.icpNumber,
-    footerIcpUrl: snapshot.footer.icpUrl,
-    footerPoliceNumber: snapshot.footer.policeNumber,
-    footerPoliceUrl: snapshot.footer.policeUrl,
-    footerUptimeStatusUrl: snapshot.footer.uptimeStatusUrl,
-    footerUptimeStatusPageUrl: snapshot.footer.uptimeStatusPageUrl
-  });
+  const [info, setInfo] = useState(() => siteInfoFromSnapshot(snapshot));
   const [stats, setStats] = useState<Stats>({});
   const [emojiPacks, setEmojiPacks] = useState<EmojiPackDraft[]>(snapshot.emojiPacks);
   const [emojiImport, setEmojiImport] = useState({ name: '', source: '' });
@@ -507,26 +304,7 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
       return false;
     }
     if (res.ok) {
-      setInfo({
-        siteTitle: data.siteTitle || info.siteTitle,
-        siteIcon: data.siteIcon || payload.siteIcon || '/site-icon.svg',
-        togetherSince: data.togetherSince || '',
-        imageMetaEnabled: data.imageMetaEnabled !== false,
-        twikooEnvId: data.twikooEnvId || '',
-        twikooRegion: data.twikooRegion ?? 'ap-shanghai',
-        announcementEnabled: data.announcementEnabled === true,
-        announcementTitle: data.announcementTitle || '',
-        announcementContent: data.announcementContent || '',
-        footerMessageUrl: data.footerMessageUrl || '',
-        footerRssUrl: data.footerRssUrl || '',
-        footerRewardUrl: data.footerRewardUrl || '',
-        footerIcpNumber: data.footerIcpNumber || '',
-        footerIcpUrl: data.footerIcpUrl || '',
-        footerPoliceNumber: data.footerPoliceNumber || '',
-        footerPoliceUrl: data.footerPoliceUrl || '',
-        footerUptimeStatusUrl: data.footerUptimeStatusUrl || '',
-        footerUptimeStatusPageUrl: data.footerUptimeStatusPageUrl || ''
-      });
+      setInfo(siteInfoFromResponse(data, payload));
       setSiteIconFiles([]);
       setSiteIconPreviewMode('current');
       router.refresh();
@@ -540,30 +318,12 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
     if (saved) setNoticeOpen(false);
   }
 
-  function mergeOAuthProviders(items: AuthProviderDraft[]) {
-    return defaultOAuthProviders.map((fallback) => ({
-      ...fallback,
-      ...(items.find((item) => item.key === fallback.key) || {}),
-      clientSecret: ''
-    }));
-  }
-
   async function loadAuthIntegrations() {
     const res = await fetch('/api/meta/auth-integrations/', { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json().catch(() => null);
     if (!data) return;
-    setAuthIntegrations({
-      registrationEmailEnabled: data.registrationEmailEnabled === true,
-      smtpHost: data.smtpHost || '',
-      smtpPort: data.smtpPort || '465',
-      smtpSecure: data.smtpSecure !== false,
-      smtpUser: data.smtpUser || '',
-      smtpFrom: data.smtpFrom || '',
-      smtpPass: '',
-      smtpPassConfigured: data.smtpPassConfigured === true,
-      oauthProviders: mergeOAuthProviders(Array.isArray(data.oauthProviders) ? data.oauthProviders : [])
-    });
+    setAuthIntegrations(authIntegrationsFromResponse(data));
   }
 
   function updateOAuthProvider(key: string, patch: Partial<AuthProviderDraft>) {
@@ -583,17 +343,7 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return alert(data.error || '认证配置保存失败');
-      setAuthIntegrations({
-        registrationEmailEnabled: data.registrationEmailEnabled === true,
-        smtpHost: data.smtpHost || '',
-        smtpPort: data.smtpPort || '465',
-        smtpSecure: data.smtpSecure !== false,
-        smtpUser: data.smtpUser || '',
-        smtpFrom: data.smtpFrom || '',
-        smtpPass: '',
-        smtpPassConfigured: data.smtpPassConfigured === true,
-        oauthProviders: mergeOAuthProviders(Array.isArray(data.oauthProviders) ? data.oauthProviders : [])
-      });
+      setAuthIntegrations(authIntegrationsFromResponse(data));
       alert('登录与注册配置已保存');
     } finally {
       setAuthIntegrationsBusy(false);
@@ -637,16 +387,6 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
     if (!res.ok) return alert(data.error || '表情包保存失败');
     setEmojiPacks(data.packs || []);
     router.refresh();
-  }
-
-  function makeEmojiItem(value: string, fallbackLabel = '表情'): EmojiItemDraft | null {
-    const raw = value.trim();
-    if (!raw) return null;
-    if (/^https?:\/\//i.test(raw)) {
-      const guessedName = raw.split(/[/?#]/).filter(Boolean).pop()?.replace(/\.[a-z0-9]+$/i, '') || fallbackLabel;
-      return { label: guessedName.slice(0, 24), url: raw };
-    }
-    return raw.slice(0, 120) as EmojiItemDraft;
   }
 
   function updateEmojiPack(index: number, patch: Partial<EmojiPackDraft>) {
@@ -701,10 +441,6 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
     } finally {
       setEmojiImportBusy(false);
     }
-  }
-
-  function emojiLabel(item: EmojiItemDraft) {
-    return typeof item === 'string' ? item : item.label || item.text || '表情';
   }
 
   async function saveProfile() {

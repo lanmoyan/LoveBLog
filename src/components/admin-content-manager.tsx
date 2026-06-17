@@ -25,6 +25,31 @@ import { useAppDialogs } from '@/components/app-dialogs';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { MediaDropzone } from '@/components/media-dropzone';
 import { useSession } from '@/components/session-provider';
+import {
+  buildImportPlan,
+  contentSignature,
+  duplicateLabel,
+  emptyEventForm,
+  emptyMessageForm,
+  emptyPostForm,
+  emptyPostMedia,
+  emptySelectedIds,
+  emptyStoryForm,
+  emptyWishForm,
+  eventFormFrom,
+  imageUrlsFrom,
+  itemsFromImport,
+  jsonBody,
+  localDateTime,
+  mediaValuesFrom,
+  postFormFrom,
+  postMediaFrom,
+  sortEvents,
+  storyFormFrom,
+  viewCopy,
+  wishStyleLabels,
+  type AdminContentView
+} from '@/lib/admin-content';
 import { formatDateTime } from '@/lib/dates';
 import type { EmojiPack } from '@/lib/settings';
 
@@ -38,178 +63,7 @@ type AdminContentManagerProps = {
   scope?: 'mine' | 'all';
 };
 
-export type AdminContentView = 'posts' | 'stories' | 'events' | 'wishlist' | 'messages';
-
-const wishStyleLabels = [
-  ['random', '随机样式'],
-  ['paper', '奶油纸'],
-  ['rose', '玫瑰粉'],
-  ['sun', '暖阳黄'],
-  ['mint', '薄荷绿'],
-  ['sky', '天空蓝'],
-  ['lavender', '薰衣草'],
-  ['custom', '自定义']
-];
-
-const viewCopy: Record<AdminContentView, { title: string; empty: string; add: string; editorAdd: string; editorEdit: string }> = {
-  posts: {
-    title: '说说管理',
-    empty: '还没有说说，点击右上角添加一条新的动态。',
-    add: '添加说说',
-    editorAdd: '发布说说',
-    editorEdit: '编辑说说'
-  },
-  stories: {
-    title: '故事管理',
-    empty: '还没有故事，点击右上角添加一篇新的记录。',
-    add: '添加故事',
-    editorAdd: '写新故事',
-    editorEdit: '编辑故事'
-  },
-  events: {
-    title: '时光管理',
-    empty: '还没有时光碎片，点击右上角添加第一张照片。',
-    add: '添加时光',
-    editorAdd: '添加时光',
-    editorEdit: '编辑时光'
-  },
-  wishlist: {
-    title: '心愿管理',
-    empty: '还没有心愿，点击右上角添加一个想一起完成的事。',
-    add: '添加心愿',
-    editorAdd: '添加心愿',
-    editorEdit: '添加心愿'
-  },
-  messages: {
-    title: '悄悄话管理',
-    empty: '还没有悄悄话，点击右上角写下一条只给自己保存的内容。',
-    add: '添加悄悄话',
-    editorAdd: '添加悄悄话',
-    editorEdit: '添加悄悄话'
-  }
-};
-
-const today = () => new Date().toISOString().slice(0, 10);
-const nowLocal = () => {
-  const date = new Date();
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
-
-function localDateTime(value: string | Date | null | undefined) {
-  if (!value) return nowLocal();
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return nowLocal();
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-}
-
-function sortEvents(items: any[]) {
-  return items.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || Number(a.id || 0) - Number(b.id || 0));
-}
-
-async function jsonBody(res: Response) {
-  return res.json().catch(() => ({}));
-}
-
-function imageUrlsFrom(value: any) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return values
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      return item?.path || item?.url || item?.src || item?.image || '';
-    })
-    .map((item) => String(item).trim())
-    .filter(Boolean)
-    .join('\n');
-}
-
-function normalizeComparable(value: unknown) {
-  return String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function normalizeMediaUrl(value: unknown) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  try {
-    const url = new URL(raw, 'https://local.invalid');
-    const localPath = url.pathname.startsWith('/api/uploads/') || url.pathname.startsWith('/uploads/') ? url.pathname : '';
-    if (localPath) return localPath.replace(/^\/uploads\//, '/api/uploads/');
-    return url.origin === 'https://local.invalid' ? url.pathname : url.toString().replace(/\/$/, '');
-  } catch {
-    return raw;
-  }
-}
-
-function mediaValuesFrom(value: any) {
-  const rawValues = Array.isArray(value) ? value : value ? [value] : [];
-  return rawValues
-    .flatMap((item) => {
-      if (typeof item === 'string') {
-        const raw = item.trim();
-        if (!raw) return [];
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) return parsed;
-        } catch {
-          // keep plain newline/comma separated input
-        }
-        return raw.split(/\r?\n|,/);
-      }
-      return [item];
-    })
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      return item?.path || item?.url || item?.src || item?.image || '';
-    })
-    .map(normalizeMediaUrl)
-    .filter(Boolean)
-    .sort();
-}
-
-function contentSignature(view: AdminContentView, item: any) {
-  if (!item || typeof item !== 'object') return '';
-
-  if (view === 'posts') {
-    const content = normalizeComparable(item.content);
-    const mood = normalizeComparable(item.mood).slice(0, 16);
-    const images = mediaValuesFrom(item.imageUrls || item.image_urls || item.images).join('|');
-    const video = normalizeMediaUrl(item.video || item.videoUrl || item.video_url);
-    if (!content && !images && !video) return '';
-    return ['posts', content, mood, images, video].join('::');
-  }
-
-  if (view === 'stories') {
-    const title = normalizeComparable(item.title);
-    const content = normalizeComparable(item.content);
-    if (!title || !content) return '';
-    return ['stories', title, content].join('::');
-  }
-
-  if (view === 'events') {
-    const date = String(item.date || '').trim().slice(0, 10);
-    const title = normalizeComparable(item.title);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) return '';
-    return ['events', date, title, normalizeComparable(item.description)].join('::');
-  }
-
-  if (view === 'wishlist') {
-    const content = normalizeComparable(item.content);
-    return content ? ['wishlist', content].join('::') : '';
-  }
-
-  const content = normalizeComparable(item.content);
-  return content ? ['messages', content].join('::') : '';
-}
-
-function duplicateLabel(view: AdminContentView) {
-  if (view === 'posts') return '说说';
-  if (view === 'stories') return '故事';
-  if (view === 'events') return '时光碎片';
-  if (view === 'wishlist') return '心愿';
-  return '悄悄话';
-}
+export type { AdminContentView } from '@/lib/admin-content';
 
 export function AdminContentManager({ initialPosts, initialEvents, initialWishlist, emojiPacks, activeView = 'posts', canAdmin = false, scope = canAdmin ? 'all' : 'mine' }: AdminContentManagerProps) {
   const router = useRouter();
@@ -226,58 +80,37 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   const [loading, setLoading] = useState(false);
 
   const [postEditingId, setPostEditingId] = useState<number | null>(null);
-  const [postForm, setPostForm] = useState({ content: '', mood: '' });
+  const [postForm, setPostForm] = useState(emptyPostForm);
   const [postFiles, setPostFiles] = useState<File[]>([]);
   const [postUrls, setPostUrls] = useState('');
   const [postVideo, setPostVideo] = useState<File | null>(null);
-  const [postExistingMedia, setPostExistingMedia] = useState<{ images: any[]; video: string }>({ images: [], video: '' });
+  const [postExistingMedia, setPostExistingMedia] = useState<{ images: any[]; video: string }>(emptyPostMedia);
   const [postConfirmRemoveImageIds, setPostConfirmRemoveImageIds] = useState<number[]>([]);
   const [postConfirmRemoveVideo, setPostConfirmRemoveVideo] = useState(false);
   const [postBusy, setPostBusy] = useState(false);
 
   const [storyEditingId, setStoryEditingId] = useState<number | null>(null);
-  const [storyForm, setStoryForm] = useState({
-    title: '',
-    excerpt: '',
-    content: '',
-    tags: '',
-    coverImage: '',
-    visibility: 'public',
-    pinned: false,
-    draft: false
-  });
+  const [storyForm, setStoryForm] = useState(emptyStoryForm);
   const [storyCover, setStoryCover] = useState<File | null>(null);
   const [storyExistingCover, setStoryExistingCover] = useState('');
   const [storyConfirmRemoveCover, setStoryConfirmRemoveCover] = useState(false);
   const [storyBusy, setStoryBusy] = useState(false);
 
   const [eventEditingId, setEventEditingId] = useState<number | null>(null);
-  const [eventForm, setEventForm] = useState({ date: today(), title: '', description: '', imageUrl: '' });
+  const [eventForm, setEventForm] = useState(emptyEventForm);
   const [eventFiles, setEventFiles] = useState<File[]>([]);
   const [eventExistingImage, setEventExistingImage] = useState('');
   const [eventConfirmRemoveImage, setEventConfirmRemoveImage] = useState(false);
   const [eventBusy, setEventBusy] = useState(false);
 
-  const [wishForm, setWishForm] = useState({
-    content: '',
-    displayAt: nowLocal(),
-    noteStyle: 'random',
-    noteColor: '#fff4b8',
-    textColor: '#3f382d'
-  });
+  const [wishForm, setWishForm] = useState(emptyWishForm);
   const [wishBusy, setWishBusy] = useState(false);
 
-  const [messageForm, setMessageForm] = useState({ content: '', color: '#fff4f6' });
+  const [messageForm, setMessageForm] = useState(emptyMessageForm);
   const [messageBusy, setMessageBusy] = useState(false);
   const [editorView, setEditorView] = useState<AdminContentView | null>(null);
   const [importingView, setImportingView] = useState<AdminContentView | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Record<AdminContentView, number[]>>({
-    posts: [],
-    stories: [],
-    events: [],
-    wishlist: [],
-    messages: []
-  });
+  const [selectedIds, setSelectedIds] = useState<Record<AdminContentView, number[]>>(emptySelectedIds);
 
   useEffect(() => {
     setEditorView(null);
@@ -334,22 +167,22 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function resetPostForm() {
     setPostEditingId(null);
-    setPostForm({ content: '', mood: '' });
+    setPostForm(emptyPostForm());
     setPostFiles([]);
     setPostUrls('');
     setPostVideo(null);
-    setPostExistingMedia({ images: [], video: '' });
+    setPostExistingMedia(emptyPostMedia());
     setPostConfirmRemoveImageIds([]);
     setPostConfirmRemoveVideo(false);
   }
 
   function editPost(post: any) {
     setPostEditingId(post.id);
-    setPostForm({ content: post.content || '', mood: post.mood || '' });
+    setPostForm(postFormFrom(post));
     setPostFiles([]);
     setPostUrls('');
     setPostVideo(null);
-    setPostExistingMedia({ images: Array.isArray(post.images) ? post.images : [], video: post.video || '' });
+    setPostExistingMedia(postMediaFrom(post));
     setPostConfirmRemoveImageIds([]);
     setPostConfirmRemoveVideo(false);
   }
@@ -450,16 +283,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function resetStoryForm() {
     setStoryEditingId(null);
-    setStoryForm({
-      title: '',
-      excerpt: '',
-      content: '',
-      tags: '',
-      coverImage: '',
-      visibility: 'public',
-      pinned: false,
-      draft: false
-    });
+    setStoryForm(emptyStoryForm());
     setStoryCover(null);
     setStoryExistingCover('');
     setStoryConfirmRemoveCover(false);
@@ -467,16 +291,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function editStory(story: any) {
     setStoryEditingId(story.id);
-    setStoryForm({
-      title: story.title || '',
-      excerpt: story.excerpt || '',
-      content: story.content || '',
-      tags: (story.tags || []).join(', '),
-      coverImage: '',
-      visibility: story.visibility || 'public',
-      pinned: !!story.pinned,
-      draft: !!story.isDraft
-    });
+    setStoryForm(storyFormFrom(story));
     setStoryCover(null);
     setStoryExistingCover(story.coverImage || '');
     setStoryConfirmRemoveCover(false);
@@ -561,7 +376,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function resetEventForm() {
     setEventEditingId(null);
-    setEventForm({ date: today(), title: '', description: '', imageUrl: '' });
+    setEventForm(emptyEventForm());
     setEventFiles([]);
     setEventExistingImage('');
     setEventConfirmRemoveImage(false);
@@ -569,7 +384,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
 
   function editEvent(event: any) {
     setEventEditingId(event.id);
-    setEventForm({ date: event.date || today(), title: event.title || '', description: event.description || '', imageUrl: '' });
+    setEventForm(eventFormFrom(event));
     setEventFiles([]);
     setEventExistingImage(event.image || '');
     setEventConfirmRemoveImage(false);
@@ -649,13 +464,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   function resetWishForm() {
-    setWishForm({
-      content: '',
-      displayAt: nowLocal(),
-      noteStyle: 'random',
-      noteColor: '#fff4b8',
-      textColor: '#3f382d'
-    });
+    setWishForm(emptyWishForm());
   }
 
   async function submitWish() {
@@ -716,7 +525,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
   }
 
   function resetMessageForm() {
-    setMessageForm({ content: '', color: '#fff4f6' });
+    setMessageForm(emptyMessageForm());
   }
 
   async function submitMessage() {
@@ -811,35 +620,6 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
     });
   }
 
-  function buildImportPlan(view: AdminContentView, items: any[]) {
-    const existingSignatures = new Set(getItems(view).map((item) => contentSignature(view, item)).filter(Boolean));
-    const importSignatures = new Set<string>();
-    const nextItems: any[] = [];
-    let skippedExisting = 0;
-    let skippedRepeated = 0;
-    let skippedInvalid = 0;
-
-    for (const item of items) {
-      const signature = contentSignature(view, item);
-      if (!signature) {
-        skippedInvalid += 1;
-        continue;
-      }
-      if (existingSignatures.has(signature)) {
-        skippedExisting += 1;
-        continue;
-      }
-      if (importSignatures.has(signature)) {
-        skippedRepeated += 1;
-        continue;
-      }
-      importSignatures.add(signature);
-      nextItems.push(item);
-    }
-
-    return { items: nextItems, skippedExisting, skippedRepeated, skippedInvalid };
-  }
-
   function toggleSelected(view: AdminContentView, id: number, checked: boolean) {
     setSelectedIds((current) => ({
       ...current,
@@ -919,12 +699,6 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function itemsFromImport(view: AdminContentView, parsed: any) {
-    if (Array.isArray(parsed)) return parsed;
-    const candidates = [parsed?.items, parsed?.[view], parsed?.data];
-    return candidates.find((item) => Array.isArray(item)) || [];
-  }
-
   async function importItem(view: AdminContentView, item: any) {
     if (!canCreateInView(view)) return false;
     if (!item || typeof item !== 'object') return false;
@@ -1002,7 +776,7 @@ export function AdminContentManager({ initialPosts, initialEvents, initialWishli
         void dialogs.alert({ message: '没有识别到可导入的内容，请选择导出的 JSON 文件。', tone: 'warning' });
         return;
       }
-      const plan = buildImportPlan(view, items);
+      const plan = buildImportPlan(view, getItems(view), items);
       const skippedBeforeImport = plan.skippedExisting + plan.skippedRepeated + plan.skippedInvalid;
       if (!plan.items.length) {
         void dialogs.alert({

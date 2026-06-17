@@ -16,7 +16,7 @@ services:
 
   love-next:
     image: "${APP_IMAGE:-ghcr.io/lanmoyan/loveblog:latest}"
-    pull_policy: always
+    pull_policy: "${APP_PULL_POLICY:-missing}"
     ports:
       - "3000:3000"
     environment:
