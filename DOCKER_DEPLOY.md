@@ -27,6 +27,7 @@ bash deploy.sh
 ```
 
 It shows a 0-100 deployment progress bar and asks Docker Compose to print plain pull progress for each image layer. Docker does not expose one perfectly accurate global download percentage, so the long `Pulling images` step may still depend on your server network speed.
+The published app image uses a smaller Alpine-based runtime image to reduce first-pull bytes. For upgrades, prefer `bash deploy.sh` or `docker compose pull && docker compose up -d` so existing layers are reused.
 
 For public production, you should still set your real domain and stronger passwords. You can either edit `docker-compose.yml` directly or create an optional `.env` file:
 

@@ -62,7 +62,11 @@ if ! "${compose_cmd[@]}" --progress=plain pull; then
 fi
 
 render_progress 75 "Starting containers"
-"${compose_cmd[@]}" up -d
+if [[ "${compose_cmd[0]}" == "docker" && "${compose_cmd[1]:-}" == "compose" ]]; then
+  "${compose_cmd[@]}" up -d --pull never
+else
+  "${compose_cmd[@]}" up -d
+fi
 
 render_progress 90 "Checking container status"
 "${compose_cmd[@]}" ps
