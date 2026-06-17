@@ -94,6 +94,15 @@ export type SiteInfoDraft = {
 
 export type AdminView = 'overview' | AdminContentView | 'site' | 'emoji' | 'profile' | 'stats' | 'users';
 export type AdminLanguage = 'zh-CN' | 'en-US';
+export type AdminNumericStats = {
+  posts: number;
+  likes: number;
+  messages: number;
+  events: number;
+  wishlist: number;
+  stories: number;
+  visits: number;
+};
 
 export const contentViews: AdminContentView[] = ['posts', 'stories', 'events', 'wishlist', 'messages'];
 export const userContentViews: AdminContentView[] = ['posts', 'stories', 'messages'];
@@ -278,6 +287,59 @@ export function makeEmojiItem(value: string, fallbackLabel = '表情'): EmojiIte
 
 export function emojiLabel(item: EmojiItemDraft) {
   return typeof item === 'string' ? item : item.label || item.text || '表情';
+}
+
+export function adminDashboardStats(stats: Stats, fallbackVisits = 0) {
+  const numericStats: AdminNumericStats = {
+    posts: Number(stats.posts || 0),
+    likes: Number(stats.likes || 0),
+    messages: Number(stats.messages || 0),
+    events: Number(stats.events || 0),
+    wishlist: Number(stats.wishlist || 0),
+    stories: Number(stats.stories || 0),
+    visits: Number(stats.visits || fallbackVisits || 0)
+  };
+  const totalContent = numericStats.posts + numericStats.events + numericStats.wishlist + numericStats.stories + numericStats.messages;
+  const chartRows = [
+    { label: '说说', value: numericStats.posts, tone: 'blue' },
+    { label: '故事', value: numericStats.stories, tone: 'violet' },
+    { label: '时光', value: numericStats.events, tone: 'teal' },
+    { label: '心愿', value: numericStats.wishlist, tone: 'green' },
+    { label: '悄悄话', value: numericStats.messages, tone: 'orange' }
+  ];
+  const maxChart = Math.max(...chartRows.map((item) => item.value), 1);
+  const trendValues = [
+    Math.max(1, Math.round(numericStats.posts * .36)),
+    Math.max(1, Math.round(numericStats.posts * .54)),
+    numericStats.events + numericStats.stories,
+    totalContent,
+    totalContent + Math.max(1, Math.round(numericStats.likes * .3)),
+    totalContent + numericStats.likes
+  ];
+  const maxTrend = Math.max(...trendValues, 1);
+  const trendPoints = trendValues
+    .map((value, index) => `${index * 104},${168 - (value / maxTrend) * 124}`)
+    .join(' ');
+  const visitSummary = stats.visitSummary || {
+    today: 0,
+    week: 0,
+    month: 0,
+    year: 0,
+    total: numericStats.visits,
+    avgDuration: 0
+  };
+
+  return {
+    numericStats,
+    totalContent,
+    chartRows,
+    maxChart,
+    trendValues,
+    maxTrend,
+    trendPoints,
+    trendArea: `0,168 ${trendPoints} 520,168`,
+    visitSummary
+  };
 }
 
 export function numberText(value: number | undefined) {

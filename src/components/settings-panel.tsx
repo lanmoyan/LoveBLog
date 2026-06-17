@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { signOut } from 'next-auth/react';
 import {
   BarChart3,
@@ -42,11 +43,11 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { AdminContentManager } from '@/components/admin-content-manager';
 import { MediaDropzone } from '@/components/media-dropzone';
 import { useSession } from '@/components/session-provider';
 import {
   adminCopy,
+  adminDashboardStats,
   adminLanguages,
   adminOnlyViews,
   adminViewHashes,
@@ -76,6 +77,20 @@ import {
   type UserRole
 } from '@/lib/admin-settings';
 import type { SiteSnapshot } from '@/lib/site';
+
+const AdminContentManager = dynamic(
+  () => import('@/components/admin-content-manager').then((mod) => mod.AdminContentManager),
+  {
+    loading: () => (
+      <article className="admin-panel admin-content-manager">
+        <div className="admin-empty-state">
+          <MessageSquare size={22} />
+          <b>内容管理加载中...</b>
+        </div>
+      </article>
+    )
+  }
+);
 
 export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
   const { user, partner, partnerCandidates, refresh } = useSession();
@@ -213,52 +228,23 @@ export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {
     };
   }, []);
 
-  const numericStats = useMemo(() => ({
-    posts: Number(stats.posts || 0),
-    likes: Number(stats.likes || 0),
-    messages: Number(stats.messages || 0),
-    events: Number(stats.events || 0),
-    wishlist: Number(stats.wishlist || 0),
-    stories: Number(stats.stories || 0),
-    visits: Number(stats.visits || snapshot.visits || 0)
-  }), [stats, snapshot.visits]);
-
-  const totalContent = numericStats.posts + numericStats.events + numericStats.wishlist + numericStats.stories + numericStats.messages;
-  const chartRows = [
-    { label: '说说', value: numericStats.posts, tone: 'blue' },
-    { label: '故事', value: numericStats.stories, tone: 'violet' },
-    { label: '时光', value: numericStats.events, tone: 'teal' },
-    { label: '心愿', value: numericStats.wishlist, tone: 'green' },
-    { label: '悄悄话', value: numericStats.messages, tone: 'orange' }
-  ];
-  const maxChart = Math.max(...chartRows.map((item) => item.value), 1);
-  const trendValues = [
-    Math.max(1, Math.round(numericStats.posts * .36)),
-    Math.max(1, Math.round(numericStats.posts * .54)),
-    numericStats.events + numericStats.stories,
+  const {
+    numericStats,
     totalContent,
-    totalContent + Math.max(1, Math.round(numericStats.likes * .3)),
-    totalContent + numericStats.likes
-  ];
-  const maxTrend = Math.max(...trendValues, 1);
-  const trendPoints = trendValues
-    .map((value, index) => `${index * 104},${168 - (value / maxTrend) * 124}`)
-    .join(' ');
-  const trendArea = `0,168 ${trendPoints} 520,168`;
+    chartRows,
+    maxChart,
+    trendValues,
+    maxTrend,
+    trendPoints,
+    trendArea,
+    visitSummary
+  } = useMemo(() => adminDashboardStats(stats, snapshot.visits), [stats, snapshot.visits]);
   const editingUser = useMemo(
     () => managedUsers.find((item) => item.id === editingUserId) || null,
     [managedUsers, editingUserId]
   );
   const emojiPackCount = emojiPacks.length;
   const emojiItemCount = emojiPacks.reduce((total, pack) => total + pack.items.length, 0);
-  const visitSummary = stats.visitSummary || {
-    today: 0,
-    week: 0,
-    month: 0,
-    year: 0,
-    total: numericStats.visits,
-    avgDuration: 0
-  };
   const visitSeries = stats.visitSeries || [];
   const maxVisitSeries = Math.max(...visitSeries.map((item) => item.visits), 1);
   const topPages = stats.topPages || [];
