@@ -43,7 +43,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { MediaDropzone } from '@/components/media-dropzone';
+import { MediaDropzoneLoading } from '@/components/media-dropzone-loading';
 import { useSession } from '@/components/session-provider';
 import {
   adminCopy,
@@ -90,6 +90,11 @@ const AdminContentManager = dynamic(
       </article>
     )
   }
+);
+
+const MediaDropzone = dynamic(
+  () => import('@/components/media-dropzone').then((mod) => mod.MediaDropzone),
+  { loading: MediaDropzoneLoading }
 );
 
 export function SettingsPanel({ snapshot }: { snapshot: SiteSnapshot }) {

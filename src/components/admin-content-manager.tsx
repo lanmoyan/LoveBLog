@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   CalendarDays,
   Check,
@@ -22,8 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAppDialogs } from '@/components/app-dialogs';
-import { EmojiPicker } from '@/components/emoji-picker';
-import { MediaDropzone } from '@/components/media-dropzone';
+import { MediaDropzoneLoading } from '@/components/media-dropzone-loading';
 import { useSession } from '@/components/session-provider';
 import {
   buildImportPlan,
@@ -52,6 +52,16 @@ import {
 } from '@/lib/admin-content';
 import { formatDateTime } from '@/lib/dates';
 import type { EmojiPack } from '@/lib/settings';
+
+const EmojiPicker = dynamic(
+  () => import('@/components/emoji-picker').then((mod) => mod.EmojiPicker),
+  { loading: () => <span className="admin-muted-pill">表情加载中...</span> }
+);
+
+const MediaDropzone = dynamic(
+  () => import('@/components/media-dropzone').then((mod) => mod.MediaDropzone),
+  { loading: MediaDropzoneLoading }
+);
 
 type AdminContentManagerProps = {
   initialPosts: any[];
