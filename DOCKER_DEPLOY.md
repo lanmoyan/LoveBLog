@@ -1,12 +1,13 @@
 # Docker Compose 部署
 
-LoveBLog 可以只用一个 `docker-compose.yml` 启动。默认镜像是：
+LoveBLog 可以只用一个 `docker-compose.yml` 启动。国内服务器默认优先走镜像代理：
 
 ```text
-ghcr.io/lanmoyan/loveblog:latest
+docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest
+docker.m.daocloud.io/library/postgres:16-alpine
 ```
 
-国内服务器访问 GHCR 可能很慢。更推荐把同一个镜像同步到阿里云、腾讯云、Docker Hub 等离服务器更近的镜像仓库，然后在 `.env` 里把 `APP_IMAGE` 改成你的镜像地址。
+直连 GHCR / Docker Hub 可能很慢。更推荐把同一个镜像同步到阿里云、腾讯云、Docker Hub 等离服务器更近的镜像仓库，然后在 `.env` 里把 `APP_IMAGE` 改成你的镜像地址。
 
 ## 初次启动
 
@@ -34,13 +35,21 @@ POSTGRES_PASSWORD=replace-with-a-strong-postgres-password
 AUTH_SECRET=replace-with-a-long-random-secret-at-least-32-chars
 NEXTAUTH_SECRET=replace-with-the-same-long-random-secret
 NEXTAUTH_URL=https://your-domain.example
-APP_IMAGE=ghcr.io/lanmoyan/loveblog:latest
+POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
+APP_IMAGE=docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest
 APP_PULL_POLICY=missing
 ```
 
 `AUTH_SECRET` / `NEXTAUTH_SECRET` 部署后要保持稳定，否则已有登录状态会失效。`POSTGRES_PASSWORD` 也要在第一次启动前设置好；数据库卷创建后再改环境变量，不会自动修改已存在的数据库密码。
 
 `APP_PULL_POLICY=missing` 表示本地没有镜像时才拉取，日常 `docker compose up -d` 会快很多。如果你想每次 `up -d` 都检查最新镜像，可以临时改成 `always`，但国内服务器会明显变慢。
+
+如果镜像代理临时不可用，把 `.env` 改回源站即可：
+
+```env
+POSTGRES_IMAGE=postgres:16-alpine
+APP_IMAGE=ghcr.io/lanmoyan/loveblog:latest
+```
 
 ## 更新到最新版
 

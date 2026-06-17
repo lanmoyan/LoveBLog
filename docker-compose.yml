@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: "${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16-alpine}"
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-love_next}"
       POSTGRES_USER: "${POSTGRES_USER:-love_next}"
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   love-next:
-    image: "${APP_IMAGE:-ghcr.io/lanmoyan/loveblog:latest}"
+    image: "${APP_IMAGE:-docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest}"
     pull_policy: "${APP_PULL_POLICY:-missing}"
     ports:
       - "3000:3000"
