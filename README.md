@@ -109,3 +109,9 @@ docker compose up -d
 ```text
 ghcr.io/lanmoyan/loveblog:latest
 ```
+
+如需在服务器或本机从源码构建镜像：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```

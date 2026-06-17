@@ -6,7 +6,7 @@ This project publishes a production image to GitHub Container Registry:
 ghcr.io/lanmoyan/loveblog:latest
 ```
 
-The default `docker-compose.yml` can run from that image, while still keeping `build: .` as a local-build fallback.
+The default `docker-compose.yml` runs from that image. Local builds use `docker-compose.build.yml` as an override.
 
 ## 1. Prepare environment
 
@@ -92,9 +92,17 @@ After new code is pushed to `main`, wait for the `Docker Image` GitHub Actions w
 
 ```bash
 cd /path/to/your/deploy-folder
-docker compose pull love-next
-docker compose up -d love-next
+docker compose down
+docker compose pull
+docker compose up -d
 docker compose logs -f love-next
+```
+
+For lower downtime, you can skip `down`:
+
+```bash
+docker compose pull
+docker compose up -d
 ```
 
 If you also changed `docker-compose.yml` or `.env.docker.example`, pull the latest repository files first:
@@ -108,5 +116,5 @@ docker compose up -d
 Local build fallback:
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```

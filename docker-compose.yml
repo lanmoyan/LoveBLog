@@ -16,7 +16,7 @@ services:
 
   love-next:
     image: ghcr.io/lanmoyan/loveblog:latest
-    build: .
+    pull_policy: always
     ports:
       - "3000:3000"
     environment:

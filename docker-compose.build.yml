@@ -1,0 +1,4 @@
+services:
+  love-next:
+    build: .
+    pull_policy: never
