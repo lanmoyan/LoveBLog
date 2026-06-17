@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-love_next}"
       POSTGRES_USER: "${POSTGRES_USER:-love_next}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-love_next_change_me}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -20,11 +20,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-love_next}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-love_next}?schema=public"
-      APP_NAME: "我们的小星球"
-      AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET to a long random value before starting}"
-      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET to the same long random value}"
-      NEXTAUTH_URL: "${NEXTAUTH_URL:?Set NEXTAUTH_URL to your public site URL}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-love_next}:${POSTGRES_PASSWORD:-love_next_change_me}@postgres:5432/${POSTGRES_DB:-love_next}?schema=public"
+      APP_NAME: "${APP_NAME:-LoveBLog}"
+      AUTH_SECRET: "${AUTH_SECRET:-}"
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:-}"
+      NEXTAUTH_URL: "${NEXTAUTH_URL:-http://localhost:3000}"
       RUN_MIGRATIONS: "${RUN_MIGRATIONS:-1}"
       NODE_OPTIONS: "${NODE_OPTIONS:---max-old-space-size=384}"
       STORAGE_DRIVER: "${STORAGE_DRIVER:-local}"

@@ -8,20 +8,32 @@ ghcr.io/lanmoyan/loveblog:latest
 
 The default `docker-compose.yml` runs from that image. Local builds use `docker-compose.build.yml` as an override.
 
-## 1. Prepare environment
+## 1. Quick start
 
-Copy the example env file:
+For a first deployment, `docker-compose.yml` alone is enough:
+
+```bash
+git clone https://github.com/lanmoyan/LoveBLog.git loveblog
+cd loveblog
+docker compose up -d
+```
+
+The app listens on port `3000` by default. PostgreSQL starts as a sibling service, migrations run automatically unless `RUN_MIGRATIONS=0`, and the app generates a persistent auth secret in the uploads volume when no secret is provided.
+
+For public production, you should still set your real domain and stronger passwords. You can either edit `docker-compose.yml` directly or create an optional `.env` file:
 
 ```bash
 cp .env.docker.example .env
 ```
 
-Edit `.env` and set:
+Recommended production values:
 
 - `POSTGRES_PASSWORD`
 - `AUTH_SECRET`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
+
+Set `POSTGRES_PASSWORD` before the first production start. If the PostgreSQL volume already exists, changing this value later does not automatically change the existing database password.
 
 By default uploads are stored in the Docker `uploads-data` volume with `STORAGE_DRIVER=local`.
 To use S3 / Cloudflare R2 instead, set `STORAGE_DRIVER=s3` and fill `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_PUBLIC_URL`.
@@ -57,7 +69,6 @@ Keep auth secrets stable after deployment, otherwise existing login sessions bec
 ## 2. First start
 
 ```bash
-docker compose pull
 docker compose up -d
 ```
 
