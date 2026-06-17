@@ -2918,11 +2918,9 @@ input:focus, textarea:focus, select:focus {
 }
 :root[data-theme="dark"] .photo-copy p,
 :root[data-theme="dark"] .time-copy p,
-:root[data-theme="dark"] .card p,
-:root[data-theme="dark"] .twikoo-empty p {
+:root[data-theme="dark"] .card p {
   color: var(--muted);
 }
-:root[data-theme="dark"] .twikoo-empty h2,
 :root[data-theme="dark"] .twikoo-card h2 {
   color: var(--ink);
 }
@@ -4776,25 +4774,8 @@ input:focus, textarea:focus, select:focus {
   font-size: 26px;
   line-height: 1.1;
 }
-.twikoo-empty {
-  min-height: clamp(320px, 38vh, 460px);
-  grid-template-columns: 38px minmax(0, 1fr);
-  align-items: center;
-  color: var(--muted);
-}
-.twikoo-empty > svg {
-  color: var(--accent);
-}
-.twikoo-empty h2,
-.twikoo-empty p {
-  margin: 0;
-}
-.twikoo-empty h2 {
-  color: var(--ink);
-  font-size: 22px;
-}
-.twikoo-empty p {
-  margin-top: 5px;
+.twikoo-empty-state {
+  width: 100%;
 }
 .twikoo-error {
   margin: 0;

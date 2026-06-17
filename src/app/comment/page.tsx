@@ -14,7 +14,7 @@ export default async function CommentPage() {
           region={snapshot.twikooRegion}
           path="/comment/"
           title="留言评论"
-          emptyText="评论区暂未配置"
+          emptyText="还没配置Twikoo评论系统。"
         />
       </section>
     </>

@@ -35,7 +35,7 @@ export function TwikooComments({
   region,
   path,
   title = '评论',
-  emptyText = '评论区暂未配置'
+  emptyText = '还没配置Twikoo评论系统。'
 }: TwikooCommentsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptReady, setScriptReady] = useState(false);
@@ -58,15 +58,7 @@ export function TwikooComments({
   }, [cleanEnvId, cleanRegion, path, scriptReady]);
 
   if (!cleanEnvId) {
-    return (
-      <section className="twikoo-card twikoo-empty">
-        <MessageCircle size={22} />
-        <div>
-          <h2>{emptyText}</h2>
-          <p>在后台基础信息中填写 Twikoo 环境 ID 或 Vercel 服务地址后，这里会开放游客评论。</p>
-        </div>
-      </section>
-    );
+    return <div className="empty-state twikoo-empty-state">{emptyText}</div>;
   }
 
   return (

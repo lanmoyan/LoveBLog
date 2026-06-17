@@ -57,7 +57,7 @@ export default async function StoryDetailPage({ params }: PageProps) {
         region={twikooRegion}
         path={`/stories/${story.slug}/`}
         title="故事评论"
-        emptyText="故事评论暂未配置"
+        emptyText="还没配置Twikoo评论系统。"
       />
     </article>
   );
