@@ -20,6 +20,14 @@ docker compose up -d
 
 The app listens on port `3000` by default. PostgreSQL starts as a sibling service, migrations run automatically unless `RUN_MIGRATIONS=0`, and the app generates a persistent auth secret in the uploads volume when no secret is provided.
 
+If your server terminal looks stuck while pulling the image, use the optional progress script:
+
+```bash
+bash deploy.sh
+```
+
+It shows a 0-100 deployment progress bar and asks Docker Compose to print plain pull progress for each image layer. Docker does not expose one perfectly accurate global download percentage, so the long `Pulling images` step may still depend on your server network speed.
+
 For public production, you should still set your real domain and stronger passwords. You can either edit `docker-compose.yml` directly or create an optional `.env` file:
 
 ```bash
