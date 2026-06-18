@@ -3,7 +3,7 @@
 LoveBLog 可以只用一个 `docker-compose.yml` 启动。国内服务器默认优先走镜像代理：
 
 ```text
-docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest
+ghcr.nju.edu.cn/lanmoyan/loveblog:latest
 docker.m.daocloud.io/library/postgres:16-alpine
 ```
 
@@ -36,7 +36,7 @@ AUTH_SECRET=replace-with-a-long-random-secret-at-least-32-chars
 NEXTAUTH_SECRET=replace-with-the-same-long-random-secret
 NEXTAUTH_URL=https://your-domain.example
 POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
-APP_IMAGE=docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest
+APP_IMAGE=ghcr.nju.edu.cn/lanmoyan/loveblog:latest
 APP_PULL_POLICY=missing
 ```
 

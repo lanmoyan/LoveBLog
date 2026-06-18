@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   love-next:
-    image: "${APP_IMAGE:-docker.m.daocloud.io/ghcr.io/lanmoyan/loveblog:latest}"
+    image: "${APP_IMAGE:-ghcr.nju.edu.cn/lanmoyan/loveblog:latest}"
     pull_policy: "${APP_PULL_POLICY:-missing}"
     ports:
       - "3000:3000"
